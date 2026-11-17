@@ -10,6 +10,7 @@ final class AppIcons {
   static const IconData palette = Icons.bolt_rounded;
   static const IconData add = Icons.add_rounded;
   static const IconData search = Icons.search_rounded;
+  static const IconData download = Icons.download_rounded;
   static const IconData filter = Icons.tune_rounded;
   static const IconData terminal = Icons.terminal_rounded;
   static const IconData folder = Icons.folder_rounded;

@@ -37,10 +37,49 @@ class AppStore {
   static String get _workspacesFile => p.join(dir, 'workspaces.json');
   static String get _notesFile => p.join(dir, 'notes.json');
   static String get _stateFile => p.join(dir, 'state.json');
+  static String get _prefsFile => p.join(dir, 'prefs.json');
 
   /// True when nothing has been saved yet: a fresh installation.
   static bool isFirstRun() =>
       !File(_settingsFile).existsSync() && !File(_projectsFile).existsSync();
+
+  static Map<String, dynamic> _loadFlags() {
+    try {
+      final f = File(_prefsFile);
+      if (!f.existsSync()) return <String, dynamic>{};
+      final parsed = Json.parse(f.readAsStringSync());
+      return Json.obj(parsed) ?? <String, dynamic>{};
+    } catch (_) {
+      return <String, dynamic>{};
+    }
+  }
+
+  /// A small named value the app remembers (e.g. dismissed update version).
+  static Object? flag(String key) => _loadFlags()[key];
+
+  /// [flag] when it holds a string, else null.
+  static String? flagString(String key) {
+    final v = flag(key);
+    return v is String ? v : null;
+  }
+
+  /// Saves a flag; a null [value] removes it.
+  static void setFlag(String key, Object? value) {
+    final m = _loadFlags();
+    if (value == null) {
+      if (m.remove(key) == null && !File(_prefsFile).existsSync()) return;
+    } else {
+      m[key] = value;
+    }
+    try {
+      File(_prefsFile).writeAsStringSync(
+        Json.encode(m, pretty: true),
+        flush: true,
+      );
+    } catch (e, st) {
+      Log.warning(_tag, 'Failed to save flags', e, st);
+    }
+  }
 
   // Settings
   static AppSettings loadSettings() {

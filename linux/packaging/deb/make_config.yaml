@@ -1,0 +1,21 @@
+display_name: DevSpace
+package_name: devspace
+maintainer:
+  name: Prateek Thakur
+  email: prateekthakur272@gmail.com
+installed_size: 60000
+priority: optional
+section: devel
+essential: false
+icon: linux/runner/resources/icon.png
+generic_name: Developer Workspace
+categories:
+  - Development
+  - Utility
+keywords:
+  - developer
+  - workspace
+  - git
+  - project
+  - ide
+startup_notify: true

@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "dev.prateekthakur" "\0"
-            VALUE "FileDescription", "devspace" "\0"
+            VALUE "FileDescription", "DevSpace" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "devspace" "\0"
+            VALUE "InternalName", "DevSpace" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 dev.prateekthakur. All rights reserved." "\0"
-            VALUE "OriginalFilename", "devspace.exe" "\0"
-            VALUE "ProductName", "devspace" "\0"
+            VALUE "OriginalFilename", "DevSpace.exe" "\0"
+            VALUE "ProductName", "DevSpace" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

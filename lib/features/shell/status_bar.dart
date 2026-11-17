@@ -112,6 +112,19 @@ class StatusBar extends StatelessWidget {
                   color: p.muted,
                   onClick: () => Platform.openUrl(AppConfig.REPOSITORY),
                 ),
+                if (state.availableUpdate != null) ...[
+                  const SizedBox(width: 4),
+                  IconBtn(
+                    icon: AppIcons.download,
+                    tooltip:
+                        'Update available: ${state.availableUpdate} — click to view',
+                    size: 20,
+                    iconSize: 13,
+                    color: p.accent,
+                    onClick: () => state.modal =
+                        ModalUpdateAvailable(state.availableUpdate!),
+                  ),
+                ],
               ],
             ),
             const SizedBox(width: 14),

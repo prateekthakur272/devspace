@@ -139,6 +139,42 @@ class AppShell extends StatelessWidget {
               Positioned.fill(
                 child: buildActiveModal(context, state),
               ),
+            // Toast Notification
+            if (state.toast != null)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 24,
+                child: IgnorePointer(
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: p.dark
+                            ? const Color(0xFF3A3F47)
+                            : const Color(0xFF1F2328),
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: T(
+                        state.toast!,
+                        color: const Color(0xFFFFFFFF),
+                        size: 12,
+                        weight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         );
       },

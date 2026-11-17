@@ -23,6 +23,11 @@ class ModalAbout extends AppModal {
   const ModalAbout();
 }
 
+class ModalUpdateAvailable extends AppModal {
+  const ModalUpdateAvailable(this.version);
+  final String version;
+}
+
 class ModalGitDetails extends AppModal {
   const ModalGitDetails(this.project, this.status);
   final Project project;

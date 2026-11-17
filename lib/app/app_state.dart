@@ -34,6 +34,9 @@ class AppState with ChangeNotifier {
   AppModal? _modal;
   bool _paletteOpen = false;
   Timer? _gitPollTimer;
+  String? _availableUpdate;
+  String? _toast;
+  Timer? _toastTimer;
 
   // Getters
   List<Project> get projects => List.unmodifiable(_projects);
@@ -57,6 +60,28 @@ class AppState with ChangeNotifier {
   set paletteOpen(bool open) {
     _paletteOpen = open;
     notifyListeners();
+  }
+
+  /// Non-null when a newer GitHub release has been detected.
+  String? get availableUpdate => _availableUpdate;
+  set availableUpdate(String? v) {
+    if (_availableUpdate != v) {
+      _availableUpdate = v;
+      notifyListeners();
+    }
+  }
+
+  /// Transient feedback toast.
+  String? get toast => _toast;
+  set toast(String? v) {
+    _toast = v;
+    notifyListeners();
+  }
+
+  void showToast(String msg) {
+    toast = msg;
+    _toastTimer?.cancel();
+    _toastTimer = Timer(const Duration(milliseconds: 3500), () => toast = null);
   }
 
   void _init() {
@@ -137,6 +162,7 @@ class AppState with ChangeNotifier {
   void dispose() {
     _disposed = true;
     _gitPollTimer?.cancel();
+    _toastTimer?.cancel();
     super.dispose();
   }
 

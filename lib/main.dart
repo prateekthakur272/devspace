@@ -13,6 +13,7 @@ import 'package:devspace/platform/platform.dart';
 import 'package:devspace/theme/theme.dart';
 import 'package:devspace/utils/app_config.dart';
 import 'package:devspace/utils/app_metadata.dart';
+import 'package:devspace/utils/update_checker.dart';
 import 'package:window_manager/legacy.dart' as wm;
 
 bool _onScreen(double x, double y, double w, double h) {
@@ -137,6 +138,19 @@ class _DevSpaceAppState extends State<DevSpaceApp>
     WidgetsBinding.instance.addObserver(this);
     HardwareKeyboard.instance.addHandler(_onKey);
     wm.windowManager.addListener(this);
+    // Check for a newer GitHub release after the first frame so it never delays startup.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdateOnce());
+  }
+
+  Future<void> _checkForUpdateOnce() async {
+    final result = await UpdateChecker.check(AppMetadata.version);
+    if (!mounted) return;
+    if (result.hasUpdate) {
+      state.availableUpdate = result.version;
+      if (result.shouldShowDialog && state.modal == null) {
+        state.modal = ModalUpdateAvailable(result.version!);
+      }
+    }
   }
 
   @override

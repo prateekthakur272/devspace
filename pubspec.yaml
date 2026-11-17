@@ -1,5 +1,5 @@
 name: devspace
-description: "A new Flutter project."
+description: "A fast, file-first desktop workspace and project dashboard for developers."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -40,6 +40,7 @@ dependencies:
   file_picker: ^13.3.3
   url_launcher: ^6.3.3
   package_info_plus: ^10.2.2
+  http: ^1.6.0
 
 dev_dependencies:
   flutter_test:

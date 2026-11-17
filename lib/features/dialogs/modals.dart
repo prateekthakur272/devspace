@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:devspace/app/app_state.dart';
 import 'package:devspace/components/buttons.dart';
@@ -7,12 +8,14 @@ import 'package:devspace/components/modifiers.dart';
 import 'package:devspace/components/text.dart';
 import 'package:devspace/core/model/models.dart';
 import 'package:devspace/features/notes/note_dialog.dart';
+import 'package:devspace/features/shell/menus.dart' show checkForUpdates;
 import 'package:devspace/platform/platform.dart';
 import 'package:devspace/theme/icons.dart';
 import 'package:devspace/theme/theme.dart';
 import 'package:devspace/utils/app_config.dart';
 import 'package:devspace/utils/app_metadata.dart';
 import 'package:devspace/utils/paths.dart';
+import 'package:devspace/utils/update_checker.dart';
 
 Widget buildActiveModal(BuildContext context, AppState state) {
   final modal = state.modal;
@@ -33,6 +36,8 @@ Widget buildActiveModal(BuildContext context, AppState state) {
           _EditProjectDialog(state: state, project: project),
         ModalSettings() => _SettingsDialog(state: state),
         ModalAbout() => _AboutDialog(state: state),
+        ModalUpdateAvailable(:final version) =>
+          _UpdateAvailableDialog(state: state, version: version),
         ModalConfirmDelete(:final project) =>
           _ConfirmDeleteDialog(state: state, project: project),
         ModalGitDetails(:final project, :final status) =>
@@ -624,6 +629,13 @@ class _AboutDialog extends StatelessWidget {
       width: 440,
       onClose: () => state.modal = null,
       actions: [
+        Btn(
+          label: 'Check for Updates…',
+          onClick: () {
+            state.modal = null;
+            checkForUpdates(state);
+          },
+        ),
         Btn(label: 'Close', primary: true, onClick: () => state.modal = null),
       ],
       child: Column(
@@ -654,6 +666,78 @@ class _AboutDialog extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _UpdateAvailableDialog extends StatelessWidget {
+  const _UpdateAvailableDialog({
+    required this.state,
+    required this.version,
+  });
+
+  final AppState state;
+  final String version;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+    return ModalScaffold(
+      title: 'Update Available',
+      width: 440,
+      onClose: _dismiss,
+      actions: [
+        Btn(label: 'Later', onClick: _dismiss),
+        Btn(
+          label: 'Download $version',
+          primary: true,
+          onClick: () {
+            state.modal = null;
+            state.availableUpdate = null;
+            unawaited(Platform.openUrl(AppConfig.RELEASES_URL));
+          },
+        ),
+      ],
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: p.accent.withOpacity(0.14),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(AppIcons.download, size: 24, color: p.accent),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                T(
+                  'Version $version is now available',
+                  size: 14,
+                  weight: FontWeight.w600,
+                ),
+                const SizedBox(height: 6),
+                T(
+                  'You are running ${AppMetadata.version}. '
+                  'Visit the GitHub releases page to download the latest build.',
+                  color: p.muted,
+                  size: 12,
+                  overflow: TextOverflow.visible,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _dismiss() {
+    state.modal = null;
+    unawaited(UpdateChecker.dismissVersion(version));
   }
 }
 

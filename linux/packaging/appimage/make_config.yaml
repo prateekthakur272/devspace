@@ -1,0 +1,13 @@
+display_name: DevSpace
+icon: linux/runner/resources/icon.png
+generic_name: Developer Workspace
+categories:
+  - Development
+  - Utility
+keywords:
+  - developer
+  - workspace
+  - git
+  - project
+  - ide
+startup_notify: true

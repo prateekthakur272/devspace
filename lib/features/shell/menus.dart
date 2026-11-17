@@ -1,7 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:devspace/app/app_state.dart';
+import 'package:devspace/core/storage/storage.dart';
+import 'package:devspace/platform/platform.dart';
 import 'package:devspace/utils/app_config.dart';
+import 'package:devspace/utils/app_metadata.dart';
+import 'package:devspace/utils/update_checker.dart';
 
 class Shortcut {
   const Shortcut(
@@ -49,6 +54,26 @@ class Shortcut {
   }
 }
 
+/// Triggers a manual update check.
+/// Shows a toast or opens the update modal so the user gets instant feedback.
+void checkForUpdates(AppState state) {
+  unawaited(_doCheckForUpdates(state));
+}
+
+Future<void> _doCheckForUpdates(AppState state) async {
+  await UpdateChecker.clearDismissed();
+  final result = await UpdateChecker.check(AppMetadata.version);
+  if (result.failed) {
+    state.showToast("Couldn't check for updates: ${result.error}");
+  } else if (result.hasUpdate) {
+    state.availableUpdate = result.version;
+    state.modal = ModalUpdateAvailable(result.version!);
+  } else {
+    state.availableUpdate = null;
+    state.showToast('${AppConfig.NAME} is up to date (${AppMetadata.version})');
+  }
+}
+
 List<PlatformMenuItem> buildMacMenus(AppState state, VoidCallback onQuit) {
   return [
     PlatformMenu(
@@ -59,6 +84,10 @@ List<PlatformMenuItem> buildMacMenus(AppState state, VoidCallback onQuit) {
             PlatformMenuItem(
               label: 'About ${AppConfig.NAME}',
               onSelected: () => state.modal = const ModalAbout(),
+            ),
+            PlatformMenuItem(
+              label: 'Check for Updates…',
+              onSelected: () => checkForUpdates(state),
             ),
           ],
         ),
@@ -122,6 +151,27 @@ List<PlatformMenuItem> buildMacMenus(AppState state, VoidCallback onQuit) {
               label: 'Refresh All Git Repos',
               shortcut: const SingleActivator(LogicalKeyboardKey.keyR, meta: true),
               onSelected: () => state.refreshAllGit(),
+            ),
+          ],
+        ),
+      ],
+    ),
+    PlatformMenu(
+      label: 'Help',
+      menus: [
+        PlatformMenuItemGroup(
+          members: [
+            PlatformMenuItem(
+              label: 'Check for Updates…',
+              onSelected: () => checkForUpdates(state),
+            ),
+            PlatformMenuItem(
+              label: 'Show Data Folder',
+              onSelected: () => Platform.reveal(AppStore.dir),
+            ),
+            PlatformMenuItem(
+              label: 'About ${AppConfig.NAME}',
+              onSelected: () => state.modal = const ModalAbout(),
             ),
           ],
         ),

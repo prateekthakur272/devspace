@@ -1,0 +1,14 @@
+display_name: DevSpace
+package_name: devspace
+summary: Fast, file-first developer workspace and project dashboard
+packager: Prateek Thakur
+packagerEmail: prateekthakur272@gmail.com
+url: https://github.com/prateekthakur272/devspace
+license: Unspecified
+description: DevSpace is a fast, file-first desktop dashboard for developers to organize projects, track git status, and launch tools seamlessly.
+icon: linux/runner/resources/icon.png
+generic_name: Developer Workspace
+categories:
+  - Development
+  - Utility
+startup_notify: true
