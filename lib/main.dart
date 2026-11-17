@@ -1,0 +1,294 @@
+import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:devspace/app/app_state.dart';
+import 'package:devspace/core/logging/log.dart';
+import 'package:devspace/core/model/models.dart';
+import 'package:devspace/core/storage/storage.dart';
+import 'package:devspace/features/shell/app_shell.dart';
+import 'package:devspace/features/shell/menus.dart';
+import 'package:devspace/features/shell/window_chrome.dart';
+import 'package:devspace/platform/platform.dart';
+import 'package:devspace/theme/theme.dart';
+import 'package:devspace/utils/app_config.dart';
+import 'package:devspace/utils/app_metadata.dart';
+import 'package:window_manager/legacy.dart' as wm;
+
+bool _onScreen(double x, double y, double w, double h) {
+  try {
+    final probe = Offset(x + 40, y + 20);
+    for (final d in PlatformDispatcher.instance.displays) {
+      final dw = d.size.width / d.devicePixelRatio;
+      final dh = d.size.height / d.devicePixelRatio;
+      if (probe.dx > -dw &&
+          probe.dx < 2 * dw &&
+          probe.dy >= -dh &&
+          probe.dy < 2 * dh) {
+        return true;
+      }
+    }
+  } catch (_) {}
+  return false;
+}
+
+bool _positionVisible(WindowGeometry? g) =>
+    g != null &&
+    g.x != null &&
+    g.y != null &&
+    _onScreen(g.x!, g.y!, g.width, g.height);
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await AppMetadata.load();
+  await Platform.init();
+  await wm.windowManager.ensureInitialized();
+
+  final isMac = Platform.isMac;
+  final saved = AppStore.loadWindow();
+  final placed = _positionVisible(saved);
+
+  await wm.windowManager.waitUntilReadyToShow(
+    wm.WindowOptions(
+      size: saved != null
+          ? Size(saved.width, saved.height)
+          : const Size(1360, 860),
+      minimumSize: const Size(840, 520),
+      center: !placed,
+      title: AppConfig.NAME,
+      titleBarStyle: wm.TitleBarStyle.hidden,
+      windowButtonVisibility: isMac,
+    ),
+    () async {
+      if (saved != null && placed) {
+        await wm.windowManager.setPosition(Offset(saved.x!, saved.y!));
+      }
+      if (saved != null && saved.maximized) {
+        await wm.windowManager.maximize();
+      }
+    },
+  );
+
+  await wm.windowManager.setPreventClose(true);
+  runApp(const DevSpaceApp());
+
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    await wm.windowManager.setOpacity(1);
+    await wm.windowManager.show();
+    await wm.windowManager.focus();
+  });
+}
+
+class _DesktopScrollBehavior extends MaterialScrollBehavior {
+  const _DesktopScrollBehavior();
+
+  @override
+  Widget buildScrollbar(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) =>
+      child;
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) =>
+      child;
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const ClampingScrollPhysics();
+}
+
+class DevSpaceApp extends StatefulWidget {
+  const DevSpaceApp({super.key});
+
+  @override
+  State<DevSpaceApp> createState() => _DevSpaceAppState();
+}
+
+class _DevSpaceAppState extends State<DevSpaceApp>
+    with WidgetsBindingObserver, wm.WindowListener {
+  late final AppState state;
+  bool maximized = false;
+  late bool dark;
+  Timer? _boundsTimer;
+  WindowGeometry? _floating = AppStore.loadWindow();
+
+  bool get isMac => Platform.isMac;
+
+  bool _computeDark() {
+    final mode = state.settings.themeMode;
+    if (mode == ThemeMode.dark) return true;
+    if (mode == ThemeMode.light) return false;
+    return WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+        Brightness.dark;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    state = AppState();
+    dark = _computeDark();
+    state.addListener(_onState);
+    WidgetsBinding.instance.addObserver(this);
+    HardwareKeyboard.instance.addHandler(_onKey);
+    wm.windowManager.addListener(this);
+  }
+
+  @override
+  void dispose() {
+    _boundsTimer?.cancel();
+    wm.windowManager.removeListener(this);
+    HardwareKeyboard.instance.removeHandler(_onKey);
+    WidgetsBinding.instance.removeObserver(this);
+    state.removeListener(_onState);
+    state.dispose();
+    super.dispose();
+  }
+
+  void _onState() {
+    final d = _computeDark();
+    setState(() => dark = d);
+  }
+
+  @override
+  void didChangePlatformBrightness() => _onState();
+
+  void _saveBoundsSoon() {
+    _boundsTimer?.cancel();
+    _boundsTimer = Timer(const Duration(milliseconds: 400), _saveBounds);
+  }
+
+  Future<void> _saveBounds() async {
+    try {
+      final max = await wm.windowManager.isMaximized();
+      if (!max &&
+          !await wm.windowManager.isFullScreen() &&
+          !await wm.windowManager.isMinimized()) {
+        final r = await wm.windowManager.getBounds();
+        _floating = WindowGeometry(r.width, r.height, r.left, r.top);
+      }
+      final f = _floating;
+      if (f != null) {
+        AppStore.saveWindow(f.copyWith(maximized: max));
+      }
+    } catch (e, st) {
+      Log.warning('window', 'Cannot save window geometry', e, st);
+    }
+  }
+
+  @override
+  void onWindowResized() => _saveBoundsSoon();
+
+  @override
+  void onWindowMoved() => _saveBoundsSoon();
+
+  @override
+  void onWindowMaximize() {
+    setState(() => maximized = true);
+    _saveBoundsSoon();
+  }
+
+  @override
+  void onWindowUnmaximize() {
+    setState(() => maximized = false);
+    _saveBoundsSoon();
+  }
+
+  @override
+  void onWindowClose() => quit();
+
+  void quit() {
+    _boundsTimer?.cancel();
+    state.persist();
+    unawaited(_saveBounds().whenComplete(wm.windowManager.destroy));
+  }
+
+  void minimize() => unawaited(wm.windowManager.minimize());
+
+  Future<void> toggleMaximize() async {
+    if (await wm.windowManager.isMaximized()) {
+      await wm.windowManager.unmaximize();
+    } else {
+      await wm.windowManager.maximize();
+    }
+  }
+
+  bool _onKey(KeyEvent e) {
+    if (e is! KeyDownEvent) return false;
+
+    final isCmdOrCtrl = isMac
+        ? HardwareKeyboard.instance.isMetaPressed
+        : HardwareKeyboard.instance.isControlPressed;
+
+    if (isCmdOrCtrl) {
+      if (e.logicalKey == LogicalKeyboardKey.keyK) {
+        state.paletteOpen = !state.paletteOpen;
+        return true;
+      }
+      if (e.logicalKey == LogicalKeyboardKey.keyN) {
+        state.modal = const ModalAddProject();
+        return true;
+      }
+      if (e.logicalKey == LogicalKeyboardKey.keyR) {
+        state.refreshAllGit();
+        return true;
+      }
+      if (e.logicalKey == LogicalKeyboardKey.comma) {
+        state.modal = const ModalSettings();
+        return true;
+      }
+      if (!isMac && e.logicalKey == LogicalKeyboardKey.keyQ) {
+        quit();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  WindowChrome get chrome => WindowChrome.desktop(
+        isMac: isMac,
+        maximized: maximized,
+        onMinimize: minimize,
+        onToggleMaximize: () => unawaited(toggleMaximize()),
+        onClose: quit,
+        onDragStart: () => unawaited(wm.windowManager.startDragging()),
+        onContextMenu: () => unawaited(wm.windowManager.popUpWindowMenu()),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final pal = DevSpaceTheme.palFor(dark);
+
+    final app = PalScope(
+      pal: pal,
+      child: MaterialApp(
+        title: AppConfig.NAME,
+        debugShowCheckedModeBanner: false,
+        theme: DevSpaceTheme.makeTheme(false),
+        darkTheme: DevSpaceTheme.makeTheme(true),
+        themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+        scrollBehavior: const _DesktopScrollBehavior(),
+        home: Scaffold(
+          body: AppShell(
+            state: state,
+            chrome: chrome,
+          ),
+        ),
+      ),
+    );
+
+    if (isMac) {
+      return PlatformMenuBar(
+        menus: buildMacMenus(state, quit),
+        child: app,
+      );
+    }
+
+    return app;
+  }
+}
