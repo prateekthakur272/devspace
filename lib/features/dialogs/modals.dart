@@ -641,14 +641,11 @@ class _AboutDialog extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: p.accent.withOpacity(0.14),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(AppIcons.radar, size: 32, color: p.accent),
+          Image.asset(
+            'assets/icons/app_icon.png',
+            width: 64,
+            height: 64,
+            filterQuality: FilterQuality.high,
           ),
           const SizedBox(height: 12),
           T(AppConfig.NAME, size: 18, weight: FontWeight.w700),

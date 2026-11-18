@@ -1,0 +1,44 @@
+# DevSpace — marketplace listing.
+# Read by the marketplace from the default branch of this repo.
+# See the marketplace's sample/.marketplace/app-info.yaml for every field.
+
+name: DevSpace
+tagline: A fast, file-first desktop workspace and project dashboard for developers.
+
+description: |
+  DevSpace is a fast, file-first desktop dashboard for developers to organize
+  projects, track git status, and launch tools seamlessly. Projects, notes,
+  and workspaces live on your local machine with instant startup and zero lag.
+
+  Keep track of your repositories with real-time Git radar: detect branches,
+  clean/dirty states, ahead/behind commit tracking, staged and unstaged
+  modifications, and commit history across all your projects at a glance.
+
+  Organize your workspace with custom project groups, quick pins, and an
+  in-pane markdown notes editor with checklists and project tag chips.
+  One-click launcher integrates automatically with installed IDEs (VS Code,
+  Android Studio, Xcode, IntelliJ IDEA, and custom editors) and developer CLI tools.
+
+  Fast and keyboard-friendly, featuring an instant Command Palette (Cmd+K / Ctrl+K),
+  platform-adaptive window chrome, and custom theme modes.
+
+category: Developer Tools
+
+# Desktop app built with Flutter. macOS builds are universal (Apple Silicon and Intel).
+supported_os:
+  - macos
+  - windows
+  - linux
+
+developer: Prateek Thakur
+website: https://github.com/prateekthakur272/devspace
+support_url: https://github.com/prateekthakur272/devspace/issues
+
+tags:
+  - workspace
+  - project-manager
+  - git
+  - dashboard
+  - notes
+  - developer-tools
+  - flutter

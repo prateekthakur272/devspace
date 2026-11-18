@@ -1,12 +1,19 @@
-// Application configuration and constants.
+// ignore_for_file: constant_identifier_names
+
+/// Static application configuration: the name, credits and links shown in the About and developer dialogs.
+///
+/// Compile-time constants only. What the running app reports about itself (version, build number, bundle id) is
+/// read at runtime by `AppMetadata` in utils/app_metadata.dart.
 final class AppConfig {
   const AppConfig._();
 
   static const String NAME = 'DevSpace';
-  static const String PACKAGE_ID = 'dev.prateekthakur.devspace';
-  static const String VERSION = '1.0.0';
   static const String COPYRIGHT = 'Copyright © 2026 dev.prateekthakur. All rights reserved.';
   static const String VENDOR = 'Prateek Thakur';
+  static const String TAGLINE =
+      'A fast, file-first desktop workspace and project dashboard for developers.';
+  static const String DESCRIPTION =
+      'DevSpace is a fast, file-first desktop dashboard for developers to organize projects, track git status, and launch tools seamlessly.';
   static const String REPOSITORY = 'https://github.com/prateekthakur272/devspace';
   static const String HOMEPAGE = REPOSITORY;
   static const String DEVELOPER_URL = 'https://github.com/prateekthakur272';

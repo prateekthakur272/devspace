@@ -55,18 +55,13 @@ class _AppTopBarState extends State<AppTopBar> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // 1. App Branding (Icon + Name)
-          Container(
-            width: 26,
-            height: 26,
-            decoration: BoxDecoration(
-              color: p.accent.withOpacity(0.14),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Center(
-              child: Icon(AppIcons.radar, size: 15, color: p.accent),
-            ),
+          Image.asset(
+            'assets/icons/header_logo.png',
+            width: 22,
+            height: 22,
+            filterQuality: FilterQuality.medium,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           const T(AppConfig.NAME, size: 14, weight: FontWeight.w700),
           const Spacer(),
           // 2. Compact Search Box at the end
