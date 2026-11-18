@@ -71,9 +71,22 @@ class GitService {
         }
       }
 
-      // 3. Get ahead / behind count relative to upstream
+      // 3. Get ahead / behind count relative to upstream & upstream branch name
       int ahead = 0;
       int behind = 0;
+      String? upstream;
+      try {
+        final upRes = await Process.run(
+          'git',
+          ['rev-parse', '--abbrev-ref', '@{upstream}'],
+          workingDirectory: projectPath,
+        ).timeout(const Duration(seconds: 3));
+        if (upRes.exitCode == 0) {
+          final u = upRes.stdout.toString().trim();
+          if (u.isNotEmpty) upstream = u;
+        }
+      } catch (_) {}
+
       try {
         final syncResult = await Process.run(
           'git',
@@ -107,10 +120,11 @@ class GitService {
       String? lastCommitHash;
       String? lastCommitMessage;
       DateTime? lastCommitDate;
+      String? lastCommitAuthor;
       try {
         final commitResult = await Process.run(
           'git',
-          ['log', '-1', '--format=%h%x00%s%x00%ct'],
+          ['log', '-1', '--format=%h%x00%s%x00%ct%x00%an'],
           workingDirectory: projectPath,
         ).timeout(const Duration(seconds: 4));
 
@@ -128,6 +142,9 @@ class GitService {
             if (secs != null && secs > 0) {
               lastCommitDate = DateTime.fromMillisecondsSinceEpoch(secs * 1000);
             }
+          }
+          if (parts.length > 3 && parts[3].isNotEmpty) {
+            lastCommitAuthor = parts[3];
           }
         }
       } catch (_) {}
@@ -149,6 +166,20 @@ class GitService {
         }
       } catch (_) {}
 
+      // 7. Remote URL
+      String? remoteUrl;
+      try {
+        final remRes = await Process.run(
+          'git',
+          ['remote', 'get-url', 'origin'],
+          workingDirectory: projectPath,
+        ).timeout(const Duration(seconds: 3));
+        if (remRes.exitCode == 0) {
+          final r = remRes.stdout.toString().trim();
+          if (r.isNotEmpty) remoteUrl = r;
+        }
+      } catch (_) {}
+
       return GitRepoStatus(
         isGitRepo: true,
         branch: branch,
@@ -162,7 +193,10 @@ class GitService {
         lastCommitHash: lastCommitHash,
         lastCommitMessage: lastCommitMessage,
         lastCommitDate: lastCommitDate,
+        lastCommitAuthor: lastCommitAuthor,
         lastTag: lastTag,
+        upstream: upstream,
+        remoteUrl: remoteUrl,
       );
     } catch (e, st) {
       Log.warning(_tag, 'Error checking git status for $projectPath', e, st);

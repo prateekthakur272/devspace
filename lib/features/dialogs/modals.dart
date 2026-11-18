@@ -6,7 +6,11 @@ import 'package:devspace/components/ide_icon.dart';
 import 'package:devspace/components/layout.dart';
 import 'package:devspace/components/modifiers.dart';
 import 'package:devspace/components/text.dart';
+import 'package:devspace/core/git/git_service.dart';
 import 'package:devspace/core/model/models.dart';
+import 'package:devspace/core/storage/storage.dart';
+import 'package:devspace/features/dialogs/developer_dialog.dart';
+import 'package:devspace/features/dialogs/onboarding_dialog.dart';
 import 'package:devspace/features/notes/note_dialog.dart';
 import 'package:devspace/features/shell/menus.dart' show checkForUpdates;
 import 'package:devspace/platform/platform.dart';
@@ -36,6 +40,7 @@ Widget buildActiveModal(BuildContext context, AppState state) {
           _EditProjectDialog(state: state, project: project),
         ModalSettings() => _SettingsDialog(state: state),
         ModalAbout() => _AboutDialog(state: state),
+        ModalDeveloper() => DeveloperDialog(state: state),
         ModalUpdateAvailable(:final version) =>
           _UpdateAvailableDialog(state: state, version: version),
         ModalConfirmDelete(:final project) =>
@@ -53,6 +58,8 @@ Widget buildActiveModal(BuildContext context, AppState state) {
           ),
         ModalEditNote(:final note) =>
           NoteDialog(state: state, existingNote: note),
+        ModalOnboarding() =>
+          OnboardingDialog(state: state),
       },
     ),
   );
@@ -410,6 +417,17 @@ class _EditProjectDialogState extends State<_EditProjectDialog> {
   }
 }
 
+enum _SettingsCategory {
+  general('General', Icons.tune_rounded),
+  editors('Editors & Tools', Icons.code_rounded),
+  git('Git & Radar', AppIcons.branch),
+  storage('Storage & Data', AppIcons.folder);
+
+  const _SettingsCategory(this.label, this.icon);
+  final String label;
+  final IconData icon;
+}
+
 class _SettingsDialog extends StatefulWidget {
   const _SettingsDialog({required this.state});
   final AppState state;
@@ -419,197 +437,794 @@ class _SettingsDialog extends StatefulWidget {
 }
 
 class _SettingsDialogState extends State<_SettingsDialog> {
-  late ThemeMode _themeMode;
-  late EditorType _defaultEditor;
-  late int _gitInterval;
+  _SettingsCategory _category = _SettingsCategory.general;
 
-  @override
-  void initState() {
-    super.initState();
-    _themeMode = widget.state.settings.themeMode;
-    _defaultEditor = widget.state.settings.defaultEditor;
-    _gitInterval = widget.state.settings.gitRefreshIntervalSeconds;
-  }
-
-  void _save() {
-    final s = widget.state.settings.copyWith(
-      themeMode: _themeMode,
-      defaultEditor: _defaultEditor,
-      gitRefreshIntervalSeconds: _gitInterval,
-    );
-    widget.state.updateSettings(s);
-    widget.state.modal = null;
+  void _updateSettings(AppSettings Function(AppSettings current) updater) {
+    final next = updater(widget.state.settings);
+    widget.state.updateSettings(next);
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
+    final settings = widget.state.settings;
+
     return ModalScaffold(
       title: 'Preferences',
+      width: 660,
       onClose: () => widget.state.modal = null,
       actions: [
-        Btn(label: 'Done', primary: true, onClick: _save),
+        Btn(
+          label: 'Done',
+          primary: true,
+          height: 32,
+          onClick: () => widget.state.modal = null,
+        ),
       ],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          T('Appearance / Theme', size: 12, weight: FontWeight.w600, color: p.muted),
-          const SizedBox(height: 6),
-          _DropdownField<ThemeMode>(
-            value: _themeMode,
-            items: const [
-              DropdownMenuItem(value: ThemeMode.system, child: T('System Preference', size: 12.5)),
-              DropdownMenuItem(value: ThemeMode.dark, child: T('Dark Theme', size: 12.5)),
-              DropdownMenuItem(value: ThemeMode.light, child: T('Light Theme', size: 12.5)),
-            ],
-            onChanged: (val) {
-              if (val != null) setState(() => _themeMode = val);
-            },
-          ),
-          const SizedBox(height: 16),
-          T('Global Default Editor', size: 12, weight: FontWeight.w600, color: p.muted),
-          const SizedBox(height: 6),
-          _DropdownField<EditorType>(
-            value: _defaultEditor,
-            items: [
-              for (final e in {
-                ...widget.state.availableEditors,
-                _defaultEditor,
-              })
-                if (e != EditorType.custom)
-                  DropdownMenuItem(
-                    value: e,
-                    child: Row(
-                      children: [
-                        IdeIcon(editor: e, size: 14),
-                        const SizedBox(width: 8),
-                        Expanded(child: T(e.label, size: 12.5)),
-                        if (widget.state.availableEditors.contains(e))
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: p.ok.withOpacity(0.14),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: T('Detected', size: 9.5, color: p.ok, weight: FontWeight.w600),
-                          ),
-                      ],
-                    ),
-                  ),
-            ],
-            onChanged: (val) {
-              if (val != null) setState(() => _defaultEditor = val);
-            },
-          ),
-          const SizedBox(height: 16),
-          T('Git Radar Polling Interval', size: 12, weight: FontWeight.w600, color: p.muted),
-          const SizedBox(height: 6),
-          _DropdownField<int>(
-            value: _gitInterval,
-            items: const [
-              DropdownMenuItem(value: 15, child: T('Every 15 seconds', size: 12.5)),
-              DropdownMenuItem(value: 30, child: T('Every 30 seconds (Default)', size: 12.5)),
-              DropdownMenuItem(value: 60, child: T('Every 1 minute', size: 12.5)),
-              DropdownMenuItem(value: 120, child: T('Every 2 minutes', size: 12.5)),
-            ],
-            onChanged: (val) {
-              if (val != null) setState(() => _gitInterval = val);
-            },
-          ),
-          const SizedBox(height: 18),
-          // Detected Developer Tools & SDKs section
-          Row(
-            children: [
-              T('Detected Developer Tools & SDKs', size: 12, weight: FontWeight.w600, color: p.muted),
-              const Spacer(),
-              Btn(
-                label: widget.state.toolsScanning ? 'Scanning…' : 'Re-scan System',
-                icon: AppIcons.refresh,
-                height: 24,
-                onClick: widget.state.toolsScanning ? null : () => widget.state.refreshDetectedTools(),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 520),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 1. Top Category Segmented Pills Bar
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: p.field,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: p.border, width: 1),
               ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: p.field,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: p.border, width: 1),
-            ),
-            child: widget.state.toolsScanning
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: Center(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  )
-                : widget.state.detectedTools.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Center(
-                          child: T('No CLI tools detected yet', size: 12, color: p.muted),
-                        ),
-                      )
-                    : Column(
-                        children: [
-                          for (final tool in widget.state.detectedTools) ...[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: BoxDecoration(
-                                      color: p.ok,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  T(tool.name, size: 12, weight: FontWeight.w600),
-                                  const SizedBox(width: 8),
-                                  T(tool.version, size: 11.5, color: p.text),
-                                  const Spacer(),
-                                  T(tool.category, size: 10.5, color: p.muted),
-                                ],
-                              ),
-                            ),
-                            if (tool != widget.state.detectedTools.last)
-                              Divider(height: 6, color: p.border.withOpacity(0.5)),
-                          ],
-                        ],
-                      ),
-          ),
-          const SizedBox(height: 20),
-          DrawTopBorder(
-            color: p.border,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 14),
               child: Row(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        T('DevSpace Data Directory', size: 12, weight: FontWeight.w600),
-                        MonoText(Paths.dataDir, size: 11, color: p.muted),
-                      ],
+                  for (final cat in _SettingsCategory.values)
+                    Expanded(
+                      child: ClickableNoRipple(
+                        onClick: () => setState(() => _category = cat),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 140),
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          decoration: BoxDecoration(
+                            color: _category == cat ? p.panel : Colors.transparent,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: _category == cat ? p.border : Colors.transparent,
+                              width: 1,
+                            ),
+                            boxShadow: _category == cat
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(p.dark ? 0.3 : 0.05),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                cat.icon,
+                                size: 13,
+                                color: _category == cat ? p.accent : p.muted,
+                              ),
+                              const SizedBox(width: 6),
+                              T(
+                                cat.label,
+                                size: 11.5,
+                                weight: _category == cat ? FontWeight.w600 : FontWeight.w500,
+                                color: _category == cat ? p.text : p.muted,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  Btn(
-                    label: 'Reveal in Finder',
-                    icon: AppIcons.folder,
-                    onClick: () => Platform.reveal(Paths.dataDir),
-                  ),
                 ],
               ),
             ),
+            const SizedBox(height: 14),
+
+            // 2. Active Category Content Area
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                child: switch (_category) {
+                  _SettingsCategory.general => _buildGeneralTab(context, p, settings),
+                  _SettingsCategory.editors => _buildEditorsTab(context, p, settings),
+                  _SettingsCategory.git => _buildGitTab(context, p, settings),
+                  _SettingsCategory.storage => _buildStorageTab(context, p),
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // --- TAB 1: GENERAL & THEME ---
+  Widget _buildGeneralTab(BuildContext context, Pal p, AppSettings settings) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Theme Selection Header
+        const T('Appearance & Theme', size: 12.5, weight: FontWeight.w700),
+        const SizedBox(height: 4),
+        T(
+          'Choose your preferred desktop interface theme mode.',
+          size: 11.5,
+          color: p.muted,
+        ),
+        const SizedBox(height: 10),
+
+        // 3 Visual Theme Selector Cards
+        Row(
+          children: [
+            _buildThemeCard(
+              p: p,
+              title: 'System',
+              subtitle: 'Match OS look',
+              icon: Icons.brightness_auto_rounded,
+              mode: ThemeMode.system,
+              selected: settings.themeMode == ThemeMode.system,
+            ),
+            const SizedBox(width: 10),
+            _buildThemeCard(
+              p: p,
+              title: 'Dark',
+              subtitle: 'Charcoal palette',
+              icon: Icons.dark_mode_rounded,
+              mode: ThemeMode.dark,
+              selected: settings.themeMode == ThemeMode.dark,
+            ),
+            const SizedBox(width: 10),
+            _buildThemeCard(
+              p: p,
+              title: 'Light',
+              subtitle: 'Daylight palette',
+              icon: Icons.light_mode_rounded,
+              mode: ThemeMode.light,
+              selected: settings.themeMode == ThemeMode.light,
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+
+        // Auto-Discovery Switch Tile
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: p.field,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: p.border, width: 1),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: p.accent.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(Icons.radar_rounded, size: 16, color: p.accent),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const T('Automatic Project Discovery', size: 12.5, weight: FontWeight.w600),
+                    const SizedBox(height: 2),
+                    T(
+                      'Periodically scan workspace root paths to discover newly cloned Git repositories.',
+                      size: 11,
+                      color: p.muted,
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: settings.autoDetectProjects,
+                activeColor: p.accent,
+                onChanged: (val) {
+                  _updateSettings((s) => s.copyWith(autoDetectProjects: val));
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // App Info & Version Banner
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: p.field,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: p.border, width: 1),
+          ),
+          child: Row(
+            children: [
+              Image.asset(
+                'assets/icons/header_logo.png',
+                width: 28,
+                height: 28,
+                filterQuality: FilterQuality.medium,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const T(AppConfig.NAME, size: 13, weight: FontWeight.w700),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: p.accent.withOpacity(0.14),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: T(
+                            'v${AppMetadata.version}',
+                            size: 10,
+                            weight: FontWeight.w700,
+                            color: p.accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    T(
+                      'Cross-platform desktop command center for local developers.',
+                      size: 11,
+                      color: p.muted,
+                    ),
+                  ],
+                ),
+              ),
+              Btn(
+                label: 'Welcome Tour…',
+                icon: Icons.explore_outlined,
+                height: 30,
+                fontSize: 11.5,
+                onClick: () => widget.state.modal = const ModalOnboarding(),
+              ),
+              const SizedBox(width: 8),
+              Btn(
+                label: 'Check for Updates…',
+                icon: Icons.update_rounded,
+                height: 30,
+                fontSize: 11.5,
+                onClick: () => checkForUpdates(widget.state),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThemeCard({
+    required Pal p,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required ThemeMode mode,
+    required bool selected,
+  }) {
+    return Expanded(
+      child: HoverBuilder(
+        cursor: SystemMouseCursors.click,
+        onTap: () => _updateSettings((s) => s.copyWith(themeMode: mode)),
+        builder: (context, hovered) {
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: selected
+                  ? p.accent.withOpacity(0.12)
+                  : hovered
+                      ? p.hover
+                      : p.field,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: selected
+                    ? p.accent
+                    : hovered
+                        ? p.accent.withOpacity(0.4)
+                        : p.border,
+                width: selected ? 1.5 : 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      icon,
+                      size: 18,
+                      color: selected ? p.accent : p.muted,
+                    ),
+                    const Spacer(),
+                    if (selected)
+                      Icon(Icons.check_circle_rounded, size: 15, color: p.accent),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                T(
+                  title,
+                  size: 12.5,
+                  weight: FontWeight.w700,
+                  color: selected ? p.accent : p.text,
+                ),
+                const SizedBox(height: 2),
+                T(subtitle, size: 10.5, color: p.muted),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // --- TAB 2: EDITORS & TOOLS ---
+  Widget _buildEditorsTab(BuildContext context, Pal p, AppSettings settings) {
+    final available = widget.state.availableEditors;
+    final allEditors = {
+      ...available,
+      settings.defaultEditor,
+      EditorType.vscode,
+      EditorType.cursor,
+      EditorType.androidStudio,
+      EditorType.intellij,
+      EditorType.xcode,
+    }.where((e) => e != EditorType.custom).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const T('Default Code Editor', size: 12.5, weight: FontWeight.w700),
+        const SizedBox(height: 4),
+        T(
+          'Double-clicking project cards and project actions open in this editor.',
+          size: 11.5,
+          color: p.muted,
+        ),
+        const SizedBox(height: 10),
+
+        // Grid of IDE selector cards
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final editor in allEditors) ...[
+              SizedBox(
+                width: 300,
+                child: HoverBuilder(
+                  cursor: SystemMouseCursors.click,
+                  onTap: () => _updateSettings((s) => s.copyWith(defaultEditor: editor)),
+                  builder: (context, hovered) {
+                    final isSelected = settings.defaultEditor == editor;
+                    final isDetected = available.contains(editor);
+
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? p.accent.withOpacity(0.12)
+                            : hovered
+                                ? p.hover
+                                : p.field,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isSelected
+                              ? p.accent
+                              : hovered
+                                  ? p.accent.withOpacity(0.4)
+                                  : p.border,
+                          width: isSelected ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          IdeIcon(editor: editor, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                T(
+                                  editor.label,
+                                  size: 12,
+                                  weight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                                  color: isSelected ? p.accent : p.text,
+                                ),
+                                T(
+                                  isDetected ? 'Installed & ready' : 'Not installed',
+                                  size: 10,
+                                  color: isDetected ? p.ok : p.muted,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: p.accent,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const T(
+                                'Default',
+                                size: 9.5,
+                                weight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 18),
+
+        // Detected Developer Tools & CLI SDKs
+        Row(
+          children: [
+            const T('Detected CLI Tools & SDKs', size: 12.5, weight: FontWeight.w700),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: p.ok.withOpacity(0.14),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: T(
+                '${widget.state.detectedTools.length} found',
+                size: 10,
+                weight: FontWeight.w700,
+                color: p.ok,
+              ),
+            ),
+            const Spacer(),
+            Btn(
+              label: widget.state.toolsScanning ? 'Scanning…' : 'Re-scan System',
+              icon: AppIcons.refresh,
+              height: 26,
+              fontSize: 11,
+              onClick: widget.state.toolsScanning ? null : () => widget.state.refreshDetectedTools(),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: p.field,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: p.border, width: 1),
+          ),
+          child: widget.state.toolsScanning
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                )
+              : widget.state.detectedTools.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Center(
+                        child: T('No developer CLI tools detected yet', size: 12, color: p.muted),
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        for (final tool in widget.state.detectedTools) ...[
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: p.ok,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                T(tool.name, size: 12, weight: FontWeight.w600),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: p.panel,
+                                    borderRadius: BorderRadius.circular(3),
+                                    border: Border.all(color: p.border, width: 0.5),
+                                  ),
+                                  child: MonoText(
+                                    tool.version,
+                                    size: 10.5,
+                                    color: p.text.withOpacity(0.85),
+                                  ),
+                                ),
+                                const Spacer(),
+                                T(tool.category, size: 10.5, color: p.muted),
+                              ],
+                            ),
+                          ),
+                          if (tool != widget.state.detectedTools.last)
+                            Divider(height: 4, color: p.border.withOpacity(0.5)),
+                        ],
+                      ],
+                    ),
+        ),
+      ],
+    );
+  }
+
+  // --- TAB 3: GIT & RADAR ---
+  Widget _buildGitTab(BuildContext context, Pal p, AppSettings settings) {
+    const intervals = [
+      (15, '15 seconds', 'High frequency / active coding'),
+      (30, '30 seconds', 'Recommended standard'),
+      (60, '1 minute', 'Balanced performance'),
+      (120, '2 minutes', 'Low battery impact'),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const T('Git Radar Background Polling', size: 12.5, weight: FontWeight.w700),
+        const SizedBox(height: 4),
+        T(
+          'Background frequency for checking git status, uncommitted changes, and remote sync.',
+          size: 11.5,
+          color: p.muted,
+        ),
+        const SizedBox(height: 10),
+
+        // Interval Cards
+        for (final item in intervals) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: HoverBuilder(
+              cursor: SystemMouseCursors.click,
+              onTap: () => _updateSettings((s) => s.copyWith(gitRefreshIntervalSeconds: item.$1)),
+              builder: (context, hovered) {
+                final isSelected = settings.gitRefreshIntervalSeconds == item.$1;
+
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 140),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? p.accent.withOpacity(0.12)
+                        : hovered
+                            ? p.hover
+                            : p.field,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: isSelected
+                          ? p.accent
+                          : hovered
+                              ? p.accent.withOpacity(0.4)
+                              : p.border,
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                        size: 16,
+                        color: isSelected ? p.accent : p.muted,
+                      ),
+                      const SizedBox(width: 10),
+                      T(
+                        item.$2,
+                        size: 12,
+                        weight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                        color: isSelected ? p.accent : p.text,
+                      ),
+                      const Spacer(),
+                      T(item.$3, size: 10.5, color: p.muted),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+
+        // Live Radar Actions Box
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: p.field,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: p.border, width: 1),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: p.accent.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(AppIcons.refresh, size: 16, color: p.accent),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    T(
+                      'Monitored Repositories: ${widget.state.projects.length}',
+                      size: 12.5,
+                      weight: FontWeight.w600,
+                    ),
+                    const SizedBox(height: 2),
+                    T(
+                      'Immediately query git status for all projects in the catalog.',
+                      size: 11,
+                      color: p.muted,
+                    ),
+                  ],
+                ),
+              ),
+              Btn(
+                label: 'Refresh All Now',
+                icon: AppIcons.refresh,
+                height: 30,
+                onClick: () {
+                  widget.state.refreshAllGit();
+                  widget.state.showToast('Refreshing all Git repositories…');
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- TAB 4: STORAGE & DATA ---
+  Widget _buildStorageTab(BuildContext context, Pal p) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const T('File Storage & Workspace Data', size: 12.5, weight: FontWeight.w700),
+        const SizedBox(height: 4),
+        T(
+          'DevSpace persists projects, developer notes, and preferences into dedicated files.',
+          size: 11.5,
+          color: p.muted,
+        ),
+        const SizedBox(height: 12),
+
+        // 1. Projects Folder
+        _buildStorageCard(
+          p: p,
+          title: 'Projects Directory',
+          subtitle: 'Individual .json file for each cataloged project (${widget.state.projects.length} files)',
+          path: AppStore.projectsDir,
+          icon: AppIcons.project,
+        ),
+        const SizedBox(height: 8),
+
+        // 2. Notes Folder
+        _buildStorageCard(
+          p: p,
+          title: 'Notes & Scratchpads Directory',
+          subtitle: 'Individual .json file for each note and checklist (${widget.state.notes.length} files)',
+          path: AppStore.notesDir,
+          icon: AppIcons.note,
+        ),
+        const SizedBox(height: 8),
+
+        // 3. Diagnostic Log File
+        _buildStorageCard(
+          p: p,
+          title: 'Rotating Diagnostic Log',
+          subtitle: 'Rotating developer log file capped at 1 MB (.old backup preserved)',
+          path: Paths.logFile(AppStore.dir),
+          icon: Icons.description_outlined,
+          isFile: true,
+        ),
+        const SizedBox(height: 8),
+
+        // 4. Master App Directory
+        _buildStorageCard(
+          p: p,
+          title: 'Master DevSpace Storage Folder',
+          subtitle: 'Contains settings.json, workspaces.json, state.json, and data subfolders',
+          path: AppStore.dir,
+          icon: AppIcons.folder,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStorageCard({
+    required Pal p,
+    required String title,
+    required String subtitle,
+    required String path,
+    required IconData icon,
+    bool isFile = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: p.field,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: p.border, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: p.accent),
+              const SizedBox(width: 8),
+              T(title, size: 12.5, weight: FontWeight.w600),
+              const Spacer(),
+              IconBtn(
+                icon: AppIcons.copy,
+                tooltip: 'Copy path',
+                size: 24,
+                iconSize: 12,
+                onClick: () {
+                  Platform.copy(path);
+                  widget.state.showToast('Copied path to clipboard');
+                },
+              ),
+              const SizedBox(width: 4),
+              Btn(
+                label: Platform.revealLabel,
+                icon: AppIcons.folder,
+                height: 26,
+                fontSize: 11,
+                onClick: () => Platform.reveal(path),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          T(subtitle, size: 11, color: p.muted),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: p.panel,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: p.border.withOpacity(0.5), width: 0.5),
+            ),
+            child: MonoText(path, size: 10.5, color: p.muted),
           ),
         ],
       ),
@@ -778,7 +1393,7 @@ class _ConfirmDeleteDialog extends StatelessWidget {
   }
 }
 
-class _GitDetailsDialog extends StatelessWidget {
+class _GitDetailsDialog extends StatefulWidget {
   const _GitDetailsDialog({
     required this.state,
     required this.project,
@@ -790,30 +1405,697 @@ class _GitDetailsDialog extends StatelessWidget {
   final GitRepoStatus status;
 
   @override
+  State<_GitDetailsDialog> createState() => _GitDetailsDialogState();
+}
+
+class _GitDetailsDialogState extends State<_GitDetailsDialog> {
+  bool _isFetching = false;
+  bool _isPulling = false;
+
+  GitRepoStatus get _status =>
+      widget.state.gitStatusFor(widget.project.id) ?? widget.status;
+
+  bool get _isLoading => widget.state.isGitLoading(widget.project.id);
+
+  Future<void> _handleFetch() async {
+    setState(() => _isFetching = true);
+    final ok = await GitService.fetch(widget.project.path);
+    await widget.state.refreshProjectGit(widget.project);
+    if (!mounted) return;
+    setState(() => _isFetching = false);
+    widget.state.showToast(ok ? 'Git fetch completed successfully' : 'Git fetch failed');
+  }
+
+  Future<void> _handlePull() async {
+    setState(() => _isPulling = true);
+    final ok = await GitService.pull(widget.project.path);
+    await widget.state.refreshProjectGit(widget.project);
+    if (!mounted) return;
+    setState(() => _isPulling = false);
+    widget.state.showToast(
+      ok ? 'Git pull completed successfully' : 'Git pull failed (check for conflicts)',
+    );
+  }
+
+  String _formatTimeAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inDays < 1) return '${diff.inHours}h ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inDays < 30) return '${diff.inDays}d ago';
+    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final p = context.pal;
+    final status = _status;
+
     return ModalScaffold(
-      title: 'Git Health: ${project.name}',
-      onClose: () => state.modal = null,
+      title: 'Git Health: ${widget.project.name}',
+      width: 620,
+      onClose: () => widget.state.modal = null,
       actions: [
-        Btn(label: 'Close', primary: true, onClick: () => state.modal = null),
+        Btn(
+          icon: AppIcons.terminal,
+          label: 'Terminal',
+          height: 32,
+          onClick: () => Platform.openInTerminal(widget.project.path),
+        ),
+        Btn(
+          icon: Icons.sync_alt_rounded,
+          label: _isFetching ? 'Fetching…' : 'Fetch',
+          height: 32,
+          onClick: _isFetching || _isPulling ? null : _handleFetch,
+        ),
+        Btn(
+          icon: Icons.arrow_downward_rounded,
+          label: _isPulling ? 'Pulling…' : 'Pull',
+          height: 32,
+          onClick: _isFetching || _isPulling ? null : _handlePull,
+        ),
+        Btn(
+          label: 'Close',
+          primary: true,
+          height: 32,
+          onClick: () => widget.state.modal = null,
+        ),
       ],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          T('Branch: ${status.branch}', size: 13, weight: FontWeight.w600),
-          if (status.lastTag != null) ...[
-            const SizedBox(height: 4),
-            T('Latest Tag: ${status.lastTag}', size: 12, weight: FontWeight.w500),
-          ],
-          if (status.lastCommitMessage != null) ...[
-            const SizedBox(height: 4),
-            T('Last Commit: ${status.lastCommitHash ?? ""} ${status.lastCommitMessage!}', size: 12),
-          ],
-          const SizedBox(height: 8),
-          T('Status: ${status.isClean ? "Clean" : "${status.totalChanges} uncommitted changes (${status.stagedCount} staged, ${status.modifiedCount} modified, ${status.untrackedCount} untracked)"}'),
-          T('Ahead: ${status.aheadCount} commits'),
-          T('Behind: ${status.behindCount} commits'),
-        ],
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 520),
+        child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 1. Identity & Path Header
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: p.field,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: p.border, width: 1),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        TechBadge(
+                          label: widget.project.techStack.label,
+                          color: widget.project.techStack.color,
+                          stack: widget.project.techStack,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              // Branch badge
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: p.accent.withOpacity(0.14),
+                                  borderRadius: BorderRadius.circular(5),
+                                  border: Border.all(color: p.accent.withOpacity(0.3), width: 1),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(AppIcons.branch, size: 12, color: p.accent),
+                                    const SizedBox(width: 4),
+                                    T(
+                                      status.branch.isNotEmpty ? status.branch : 'HEAD',
+                                      size: 11.5,
+                                      weight: FontWeight.w700,
+                                      color: p.accent,
+                                    ),
+                                    if (status.upstream != null) ...[
+                                      const SizedBox(width: 4),
+                                      Icon(Icons.arrow_forward_rounded, size: 10, color: p.accent),
+                                      const SizedBox(width: 3),
+                                      T(
+                                        status.upstream!,
+                                        size: 11,
+                                        weight: FontWeight.w500,
+                                        color: p.accent.withOpacity(0.85),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              // Tag badge if available
+                              if (status.lastTag != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: p.panel,
+                                    borderRadius: BorderRadius.circular(5),
+                                    border: Border.all(color: p.border, width: 1),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.sell_outlined, size: 11, color: p.muted),
+                                      const SizedBox(width: 4),
+                                      T(status.lastTag!, size: 11, weight: FontWeight.w600),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        // Refresh status button
+                        Btn(
+                          icon: AppIcons.refresh,
+                          label: _isLoading ? 'Checking…' : 'Refresh',
+                          height: 28,
+                          fontSize: 11,
+                          onClick: _isLoading ? null : () => widget.state.refreshProjectGit(widget.project),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Path row
+                    Row(
+                      children: [
+                        Icon(AppIcons.folder, size: 12, color: p.muted),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: MonoText(
+                            widget.project.path,
+                            size: 11,
+                            color: p.muted,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        IconBtn(
+                          icon: AppIcons.copy,
+                          tooltip: 'Copy path',
+                          size: 24,
+                          iconSize: 12,
+                          onClick: () {
+                            Platform.copy(widget.project.path);
+                            widget.state.showToast('Copied path to clipboard');
+                          },
+                        ),
+                        const SizedBox(width: 2),
+                        IconBtn(
+                          icon: AppIcons.external,
+                          tooltip: Platform.revealLabel,
+                          size: 24,
+                          iconSize: 12,
+                          onClick: () => Platform.reveal(widget.project.path),
+                        ),
+                      ],
+                    ),
+                    // Remote URL row
+                    if (status.remoteUrl != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.cloud_outlined, size: 12, color: p.muted),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: MonoText(
+                              status.remoteUrl!,
+                              size: 11,
+                              color: p.muted,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          IconBtn(
+                            icon: AppIcons.copy,
+                            tooltip: 'Copy remote URL',
+                            size: 24,
+                            iconSize: 12,
+                            onClick: () {
+                              Platform.copy(status.remoteUrl!);
+                              widget.state.showToast('Copied remote URL to clipboard');
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 2. Health & Sync Hero Cards (Two Column Split)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Working Tree Card
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: status.isClean
+                            ? p.ok.withOpacity(0.08)
+                            : p.warn.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: status.isClean
+                              ? p.ok.withOpacity(0.3)
+                              : p.warn.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: status.isClean
+                                  ? p.ok.withOpacity(0.16)
+                                  : p.warn.withOpacity(0.16),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Icon(
+                                status.isClean
+                                    ? Icons.check_circle_outline_rounded
+                                    : Icons.error_outline_rounded,
+                                size: 18,
+                                color: status.isClean ? p.ok : p.warn,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                T(
+                                  status.isClean
+                                      ? 'Working Tree Clean'
+                                      : '${status.totalChanges} Uncommitted Changes',
+                                  size: 12.5,
+                                  weight: FontWeight.w700,
+                                  color: status.isClean ? p.ok : p.warn,
+                                ),
+                                const SizedBox(height: 2),
+                                T(
+                                  status.isClean
+                                      ? 'No pending modifications'
+                                      : '${status.stagedCount} staged, ${status.modifiedCount} modified, ${status.untrackedCount} untracked',
+                                  size: 11,
+                                  color: p.muted,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+
+                  // Remote Sync State Card
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: status.isSynced
+                            ? p.ok.withOpacity(0.08)
+                            : status.needsSync
+                                ? (status.aheadCount > 0 && status.behindCount > 0
+                                    ? p.warn.withOpacity(0.08)
+                                    : status.behindCount > 0
+                                        ? p.err.withOpacity(0.08)
+                                        : p.accent.withOpacity(0.08))
+                                : p.field,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: status.isSynced
+                              ? p.ok.withOpacity(0.3)
+                              : status.needsSync
+                                  ? (status.aheadCount > 0 && status.behindCount > 0
+                                      ? p.warn.withOpacity(0.3)
+                                      : status.behindCount > 0
+                                          ? p.err.withOpacity(0.3)
+                                          : p.accent.withOpacity(0.3))
+                                  : p.border,
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: status.isSynced
+                                  ? p.ok.withOpacity(0.16)
+                                  : status.needsSync
+                                      ? (status.aheadCount > 0 && status.behindCount > 0
+                                          ? p.warn.withOpacity(0.16)
+                                          : status.behindCount > 0
+                                              ? p.err.withOpacity(0.16)
+                                              : p.accent.withOpacity(0.16))
+                                      : p.panel,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Icon(
+                                status.isSynced
+                                    ? Icons.sync_rounded
+                                    : status.aheadCount > 0 && status.behindCount > 0
+                                        ? Icons.sync_problem_rounded
+                                        : status.behindCount > 0
+                                            ? Icons.arrow_downward_rounded
+                                            : status.aheadCount > 0
+                                                ? Icons.arrow_upward_rounded
+                                                : Icons.cloud_off_outlined,
+                                size: 18,
+                                color: status.isSynced
+                                    ? p.ok
+                                    : status.aheadCount > 0 && status.behindCount > 0
+                                        ? p.warn
+                                        : status.behindCount > 0
+                                            ? p.err
+                                            : status.aheadCount > 0
+                                                ? p.accent
+                                                : p.muted,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                T(
+                                  status.isSynced
+                                      ? 'Up to Date'
+                                      : status.aheadCount > 0 && status.behindCount > 0
+                                          ? 'Diverged from Upstream'
+                                          : status.aheadCount > 0
+                                              ? '${status.aheadCount} Commit${status.aheadCount > 1 ? "s" : ""} Ahead'
+                                              : status.behindCount > 0
+                                                  ? '${status.behindCount} Commit${status.behindCount > 1 ? "s" : ""} Behind'
+                                                  : 'Local Branch Only',
+                                  size: 12.5,
+                                  weight: FontWeight.w700,
+                                  color: status.isSynced
+                                      ? p.ok
+                                      : status.aheadCount > 0 && status.behindCount > 0
+                                          ? p.warn
+                                          : status.behindCount > 0
+                                              ? p.err
+                                              : status.aheadCount > 0
+                                                  ? p.accent
+                                                  : p.text,
+                                ),
+                                const SizedBox(height: 2),
+                                T(
+                                  status.isSynced
+                                      ? 'Synchronized with ${status.upstream ?? "remote"}'
+                                      : status.aheadCount > 0 && status.behindCount > 0
+                                          ? '↑ ${status.aheadCount} to push, ↓ ${status.behindCount} to pull'
+                                          : status.aheadCount > 0
+                                              ? 'Ready to push to upstream'
+                                              : status.behindCount > 0
+                                                  ? 'Pull to update local branch'
+                                                  : 'No remote tracking branch configured',
+                                  size: 11,
+                                  color: p.muted,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // 3. Changes Breakdown Grid (Staged, Modified, Untracked)
+              Row(
+                children: [
+                  // Staged card
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: p.field,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: status.stagedCount > 0 ? p.ok.withOpacity(0.35) : p.border,
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              T(
+                                '+${status.stagedCount}',
+                                size: 18,
+                                weight: FontWeight.w700,
+                                color: status.stagedCount > 0 ? p.ok : p.muted,
+                              ),
+                              const Spacer(),
+                              Icon(
+                                Icons.add_circle_outline_rounded,
+                                size: 14,
+                                color: status.stagedCount > 0 ? p.ok : p.muted,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          const T('Staged Files', size: 11.5, weight: FontWeight.w600),
+                          T('Ready for commit', size: 10, color: p.muted),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Modified card
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: p.field,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: status.modifiedCount > 0 ? p.warn.withOpacity(0.35) : p.border,
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              T(
+                                '~${status.modifiedCount}',
+                                size: 18,
+                                weight: FontWeight.w700,
+                                color: status.modifiedCount > 0 ? p.warn : p.muted,
+                              ),
+                              const Spacer(),
+                              Icon(
+                                Icons.edit_note_rounded,
+                                size: 16,
+                                color: status.modifiedCount > 0 ? p.warn : p.muted,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          const T('Modified Files', size: 11.5, weight: FontWeight.w600),
+                          T('Unstaged edits', size: 10, color: p.muted),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Untracked card
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: p.field,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: status.untrackedCount > 0 ? p.accent.withOpacity(0.35) : p.border,
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              T(
+                                '?${status.untrackedCount}',
+                                size: 18,
+                                weight: FontWeight.w700,
+                                color: status.untrackedCount > 0 ? p.accent : p.muted,
+                              ),
+                              const Spacer(),
+                              Icon(
+                                Icons.help_outline_rounded,
+                                size: 14,
+                                color: status.untrackedCount > 0 ? p.accent : p.muted,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          const T('Untracked Files', size: 11.5, weight: FontWeight.w600),
+                          T('New files', size: 10, color: p.muted),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // Stash notice (if stash exists)
+              if (status.hasStash) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: p.warn.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: p.warn.withOpacity(0.3), width: 1),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.inventory_2_outlined, size: 14, color: p.warn),
+                      const SizedBox(width: 8),
+                      T(
+                        'Git Stash contains saved modifications.',
+                        size: 11.5,
+                        weight: FontWeight.w600,
+                        color: p.warn,
+                      ),
+                      const Spacer(),
+                      T(
+                        'Run git stash pop in terminal to restore',
+                        size: 10.5,
+                        color: p.muted,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+
+              // 4. Latest Commit Card
+              if (status.lastCommitMessage != null || status.lastCommitHash != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: p.field,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: p.border, width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(AppIcons.commit, size: 13, color: p.accent),
+                          const SizedBox(width: 6),
+                          const T('Latest Commit', size: 12, weight: FontWeight.w700),
+                          const Spacer(),
+                          if (status.lastCommitHash != null) ...[
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: p.panel,
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: p.border, width: 1),
+                              ),
+                              child: MonoText(
+                                status.lastCommitHash!,
+                                size: 10.5,
+                                color: p.accent,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            IconBtn(
+                              icon: AppIcons.copy,
+                              tooltip: 'Copy commit hash',
+                              size: 22,
+                              iconSize: 11,
+                              onClick: () {
+                                Platform.copy(status.lastCommitHash!);
+                                widget.state.showToast('Copied commit hash');
+                              },
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (status.lastCommitMessage != null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: p.panel,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: p.border.withOpacity(0.6), width: 1),
+                          ),
+                          child: SelectableText(
+                            status.lastCommitMessage!,
+                            style: TextStyle(
+                              color: p.text,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w500,
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 12,
+                        runSpacing: 4,
+                        children: [
+                          if (status.lastCommitAuthor != null)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.person_outline_rounded, size: 12, color: p.muted),
+                                const SizedBox(width: 4),
+                                T(status.lastCommitAuthor!, size: 11, color: p.muted),
+                              ],
+                            ),
+                          if (status.lastCommitDate != null)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.access_time_rounded, size: 12, color: p.muted),
+                                const SizedBox(width: 4),
+                                T(
+                                  '${_formatTimeAgo(status.lastCommitDate!)} (${status.lastCommitDate!.toString().substring(0, 16)})',
+                                  size: 11,
+                                  color: p.muted,
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

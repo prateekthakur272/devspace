@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:devspace/components/modifiers.dart';
 import 'package:devspace/components/text.dart';
+import 'package:devspace/theme/icons.dart';
 import 'package:devspace/theme/theme.dart';
 
 const double kControlHeight = 34.0;
@@ -145,7 +146,9 @@ class IconBtn extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
           ),
           child: Center(
-            child: Icon(icon, size: iconSize, color: c),
+            child: icon == AppIcons.github
+                ? GitHubIcon(size: iconSize, color: c)
+                : Icon(icon, size: iconSize, color: c),
           ),
         );
       },

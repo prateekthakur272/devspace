@@ -17,6 +17,8 @@ final class AppConfig {
   static const String REPOSITORY = 'https://github.com/prateekthakur272/devspace';
   static const String HOMEPAGE = REPOSITORY;
   static const String DEVELOPER_URL = 'https://github.com/prateekthakur272';
+  static const String MORE_APPS_URL =
+      'https://prateekthakur272.github.io/github-marketplace/';
   static const String ISSUES_URL = '$HOMEPAGE/issues/new';
 
   /// GitHub Releases page — opened when the user clicks "Download" in the update dialog.

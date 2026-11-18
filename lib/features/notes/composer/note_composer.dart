@@ -36,6 +36,7 @@ class NoteComposer extends StatefulWidget {
     this.existingNote,
     this.initialProjectId,
     this.initialTag,
+    this.initialChecklist = false,
     this.dialogMode = false,
   });
 
@@ -43,6 +44,7 @@ class NoteComposer extends StatefulWidget {
   final Note? existingNote;
   final String? initialProjectId;
   final String? initialTag;
+  final bool initialChecklist;
   final VoidCallback onClose;
   final bool dialogMode;
 
@@ -111,7 +113,7 @@ class _NoteComposerState extends State<NoteComposer> {
   _Save _saveState = _Save.idle;
   Timer? _debounce;
   bool _dirty = false;
-  String _seedMd = '';
+  final Set<String> _seedTexts = {};
   RegExp? _mentionRe;
   late String _lastTitle;
 
@@ -163,7 +165,6 @@ class _NoteComposerState extends State<NoteComposer> {
 
     _buildMentionRe();
     _setBlocks(_initialBlocks(note));
-    if (_isNew) _seedMd = _bodyMd();
     _snap(now: true);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -181,11 +182,19 @@ class _NoteComposerState extends State<NoteComposer> {
     _debounce?.cancel();
     _histTimer?.cancel();
     if (_dirty) {
-      final note = _buildNote();
-      if (note != null) {
-        final isNew = _noteId == null;
-        final state = widget.state;
-        Future.microtask(() => isNew ? state.addNote(note) : state.updateNote(note));
+      if (!_hasContent) {
+        if (_noteId != null) {
+          final id = _noteId!;
+          final state = widget.state;
+          Future.microtask(() => state.deleteNote(id));
+        }
+      } else {
+        final note = _buildNote();
+        if (note != null && !note.isEmpty) {
+          final isNew = _noteId == null;
+          final state = widget.state;
+          Future.microtask(() => isNew ? state.addNote(note) : state.updateNote(note));
+        }
       }
     }
     _titleCtrl.dispose();
@@ -216,14 +225,24 @@ class _NoteComposerState extends State<NoteComposer> {
   /// checklist, tags, projects, links) into the document body.
   List<ParsedBlock> _initialBlocks(Note? note) {
     if (note == null) {
-      final seed = <ParsedBlock>[ParsedBlock()];
+      final seed = <ParsedBlock>[
+        if (widget.initialChecklist)
+          ParsedBlock(type: BlockType.todo)
+        else
+          ParsedBlock(),
+      ];
       final extra = <String>[];
       if (widget.initialTag != null) extra.add(_normTag(widget.initialTag!));
       for (final p in widget.state.projects) {
         if (p.id == widget.initialProjectId) extra.add('@${p.name}');
       }
       if (extra.isNotEmpty) {
-        seed.add(ParsedBlock(text: extra.join(' ')));
+        final line = extra.join(' ');
+        _seedTexts.add(line);
+        for (final item in extra) {
+          _seedTexts.add(item);
+        }
+        seed.add(ParsedBlock(text: line));
       }
       return seed;
     }
@@ -347,12 +366,28 @@ class _NoteComposerState extends State<NoteComposer> {
     }
   }
 
+  bool get _hasContent {
+    if (_titleCtrl.text.trim().isNotEmpty) return true;
+    for (final b in _blocks) {
+      final t = b.ctrl.text.trim();
+      if (t.isEmpty) continue;
+      if (b.type == BlockType.todo) {
+        return true;
+      }
+      if (_seedTexts.contains(t)) continue;
+      var stripped = t;
+      for (final seed in _seedTexts) {
+        stripped = stripped.replaceAll(seed, '');
+      }
+      if (stripped.trim().isNotEmpty) return true;
+    }
+    return false;
+  }
+
   Note? _buildNote() {
+    if (!_hasContent) return null;
     final title = _titleCtrl.text.trim();
     final md = _bodyMd();
-    if (_noteId == null && title.isEmpty && (md.trim().isEmpty || md == _seedMd)) {
-      return null; // never persist an empty brand-new note
-    }
     final like = [
       for (final b in _blocks) ParsedBlockLike(b.ctrl.text, isCode: b.type == BlockType.code),
     ];
@@ -367,7 +402,7 @@ class _NoteComposerState extends State<NoteComposer> {
           ChecklistItem(id: b.checkId, text: b.ctrl.text, checked: b.checked),
     ];
     final now = DateTime.now();
-    return Note(
+    final note = Note(
       id: _noteId ?? 'note_${now.microsecondsSinceEpoch}',
       title: title,
       content: md,
@@ -380,6 +415,8 @@ class _NoteComposerState extends State<NoteComposer> {
       createdAt: _createdAt,
       updatedAt: now,
     );
+    if (note.isEmpty) return null;
+    return note;
   }
 
   void _autosave() {
@@ -390,8 +427,20 @@ class _NoteComposerState extends State<NoteComposer> {
   void _commit() {
     _debounce?.cancel();
     if (!_dirty) return;
+    if (!_hasContent) {
+      if (_noteId != null) {
+        widget.state.deleteNote(_noteId!);
+        _noteId = null;
+      }
+      _dirty = false;
+      return;
+    }
     final note = _buildNote();
-    if (note == null) {
+    if (note == null || note.isEmpty) {
+      if (_noteId != null) {
+        widget.state.deleteNote(_noteId!);
+        _noteId = null;
+      }
       _dirty = false;
       return;
     }

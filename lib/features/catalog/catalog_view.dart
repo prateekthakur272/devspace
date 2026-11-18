@@ -408,8 +408,10 @@ class _EmptyCatalogState extends StatelessWidget {
             ),
             const SizedBox(height: 22),
             // Primary interactive button actions
-            Row(
-              mainAxisSize: MainAxisSize.min,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
               children: [
                 Btn(
                   label: 'Browse Folder…',
@@ -418,13 +420,19 @@ class _EmptyCatalogState extends StatelessWidget {
                   height: 34,
                   onClick: () => _pickSingleFolder(context),
                 ),
-                const SizedBox(width: 8),
                 Btn(
                   label: 'Add Manually…',
                   icon: AppIcons.add,
                   outlined: true,
                   height: 34,
                   onClick: () => state.modal = const ModalAddProject(),
+                ),
+                Btn(
+                  label: 'Welcome Tour…',
+                  icon: Icons.explore_outlined,
+                  outlined: true,
+                  height: 34,
+                  onClick: () => state.modal = const ModalOnboarding(),
                 ),
               ],
             ),

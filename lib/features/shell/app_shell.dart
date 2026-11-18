@@ -53,6 +53,7 @@ class AppShell extends StatelessWidget {
                               children: [
                                 if (chrome.leftInset > 0)
                                   SizedBox(width: chrome.leftInset),
+                                if (chrome.menuBar != null) chrome.menuBar!,
                                 const Spacer(),
                                 if (chrome.controls != null) chrome.controls!,
                               ],

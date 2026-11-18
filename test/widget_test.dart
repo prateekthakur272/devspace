@@ -44,11 +44,50 @@ void main() {
     );
 
     AppStore.saveProjects([testProject]);
+
+    // Verify project is stored in its own file in the projects directory
+    final projectFile = File('${AppStore.projectsDir}/p1.json');
+    expect(projectFile.existsSync(), isTrue);
+
     final loaded = AppStore.loadProjects();
     expect(loaded.length, equals(1));
     expect(loaded.first.name, equals('Test Project'));
     expect(loaded.first.techStack, equals(TechStack.flutter));
     expect(loaded.first.tags, contains('flutter'));
+  });
+
+  test('AppStore stores notes in a notes folder with a file for each and migrates legacy notes', () {
+    final note1 = Note(
+      id: 'n1',
+      title: 'First Note',
+      content: 'Note 1 content',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    final note2 = Note(
+      id: 'n2',
+      title: 'Second Note',
+      content: 'Note 2 content',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    // 1. Save notes list into individual files in notes folder
+    AppStore.saveNotes([note1, note2]);
+
+    final n1File = File('${AppStore.notesDir}/n1.json');
+    final n2File = File('${AppStore.notesDir}/n2.json');
+    expect(n1File.existsSync(), isTrue);
+    expect(n2File.existsSync(), isTrue);
+
+    final loaded = AppStore.loadNotes();
+    expect(loaded.length, equals(2));
+
+    // 2. Delete note1 by saving only note2 -> n1.json gets deleted
+    AppStore.saveNotes([note2]);
+    expect(n1File.existsSync(), isFalse);
+    expect(n2File.existsSync(), isTrue);
+    expect(AppStore.loadNotes().length, equals(1));
   });
 
   test('AppState manages projects, pins, and filtering', () async {
@@ -118,6 +157,7 @@ void main() {
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.resetPhysicalSize);
 
+    AppStore.setFlag('onboarding_completed', true);
     final state = AppState();
 
     // Pump AppShell wrapped in MaterialApp and PalScope
@@ -280,16 +320,18 @@ void main() {
     expect(state.paneCreatingNote, isFalse);
 
     // 2. Open new note in pane
-    state.openNewNoteInPane(initialProjectId: 'p1');
+    state.openNewNoteInPane(initialProjectId: 'p1', initialChecklist: true);
     expect(state.paneCreatingNote, isTrue);
     expect(state.paneEditingNote, isNull);
     expect(state.paneInitialProjectId, equals('p1'));
+    expect(state.paneInitialChecklist, isTrue);
     expect(state.uiState.notesPaneVisible, isTrue);
     expect(state.modal, isNull); // Ensures no blocking dialog
 
     // 3. Close pane editor
     state.closePaneNoteEditor();
     expect(state.paneCreatingNote, isFalse);
+    expect(state.paneInitialChecklist, isFalse);
 
     // 4. Open existing note in pane
     final note = Note(

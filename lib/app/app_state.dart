@@ -47,6 +47,8 @@ class AppState with ChangeNotifier {
   SavedState get uiState => _uiState;
   Map<String, GitRepoStatus> get gitStatuses => Map.unmodifiable(_gitStatuses);
   Map<String, bool> get gitLoading => Map.unmodifiable(_gitLoading);
+  GitRepoStatus? gitStatusFor(String projectId) => _gitStatuses[projectId];
+  bool isGitLoading(String projectId) => _gitLoading[projectId] ?? false;
   List<EditorType> get availableEditors => List.unmodifiable(_availableEditors);
   List<DetectedTool> get detectedTools => List.unmodifiable(_detectedTools);
   bool get toolsScanning => _toolsScanning;
@@ -54,6 +56,12 @@ class AppState with ChangeNotifier {
   AppModal? get modal => _modal;
   set modal(AppModal? m) {
     _modal = m;
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void setGitStatusForTesting(String projectId, GitRepoStatus status) {
+    _gitStatuses[projectId] = status;
     notifyListeners();
   }
 
@@ -89,7 +97,7 @@ class AppState with ChangeNotifier {
     _settings = AppStore.loadSettings();
     _projects = AppStore.loadProjects().toList();
     _workspaces = AppStore.loadWorkspaces().toList();
-    _notes = AppStore.loadNotes().toList();
+    _notes = AppStore.loadNotes().where((n) => !n.isEmpty).toList();
     _uiState = AppStore.loadState();
 
     // Start background git status polling
@@ -100,6 +108,13 @@ class AppState with ChangeNotifier {
 
     // Auto-detect installed editors and developer tools
     refreshDetectedTools();
+
+    // Launch initial onboarding tour on first run
+    if (AppStore.needsOnboarding) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        modal = const ModalOnboarding();
+      });
+    }
   }
 
   Future<void> refreshDetectedTools() async {
@@ -424,12 +439,17 @@ class AppState with ChangeNotifier {
   // --- Notes Management ---
 
   void addNote(Note note) {
+    if (note.isEmpty) return;
     _notes.insert(0, note);
     AppStore.saveNotes(_notes);
     notifyListeners();
   }
 
   void updateNote(Note updated) {
+    if (updated.isEmpty) {
+      deleteNote(updated.id);
+      return;
+    }
     final idx = _notes.indexWhere((n) => n.id == updated.id);
     if (idx != -1) {
       _notes[idx] = updated.copyWith(updatedAt: DateTime.now());
@@ -512,17 +532,20 @@ class AppState with ChangeNotifier {
   bool _paneCreatingNote = false;
   String? _paneInitialProjectId;
   String? _paneInitialTag;
+  bool _paneInitialChecklist = false;
 
   Note? get paneEditingNote => _paneEditingNote;
   bool get paneCreatingNote => _paneCreatingNote;
   String? get paneInitialProjectId => _paneInitialProjectId;
   String? get paneInitialTag => _paneInitialTag;
+  bool get paneInitialChecklist => _paneInitialChecklist;
 
   void openNoteInPane(Note note) {
     _paneEditingNote = note;
     _paneCreatingNote = false;
     _paneInitialProjectId = null;
     _paneInitialTag = null;
+    _paneInitialChecklist = false;
     if (!_uiState.notesPaneVisible) {
       _uiState = _uiState.copyWith(notesPaneVisible: true);
       AppStore.saveState(_uiState);
@@ -530,11 +553,16 @@ class AppState with ChangeNotifier {
     notifyListeners();
   }
 
-  void openNewNoteInPane({String? initialProjectId, String? initialTag}) {
+  void openNewNoteInPane({
+    String? initialProjectId,
+    String? initialTag,
+    bool initialChecklist = false,
+  }) {
     _paneEditingNote = null;
     _paneCreatingNote = true;
     _paneInitialProjectId = initialProjectId;
     _paneInitialTag = initialTag;
+    _paneInitialChecklist = initialChecklist;
     if (!_uiState.notesPaneVisible) {
       _uiState = _uiState.copyWith(notesPaneVisible: true);
       AppStore.saveState(_uiState);
@@ -547,6 +575,7 @@ class AppState with ChangeNotifier {
     _paneCreatingNote = false;
     _paneInitialProjectId = null;
     _paneInitialTag = null;
+    _paneInitialChecklist = false;
     notifyListeners();
   }
 }

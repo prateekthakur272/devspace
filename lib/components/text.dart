@@ -13,6 +13,7 @@ class T extends StatelessWidget {
     this.overflow = TextOverflow.ellipsis,
     this.italic = false,
     this.align,
+    this.softWrap,
   });
 
   final String text;
@@ -23,6 +24,7 @@ class T extends StatelessWidget {
   final TextOverflow overflow;
   final bool italic;
   final TextAlign? align;
+  final bool? softWrap;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +34,7 @@ class T extends StatelessWidget {
       maxLines: maxLines,
       overflow: overflow,
       textAlign: align,
+      softWrap: softWrap ?? (maxLines == 1 ? false : null),
       style: TextStyle(
         fontSize: size,
         fontWeight: weight ?? FontWeight.w400,
@@ -51,19 +54,27 @@ class MonoText extends StatelessWidget {
     this.size = 12,
     this.color,
     this.weight,
+    this.maxLines = 1,
+    this.overflow = TextOverflow.ellipsis,
+    this.softWrap = false,
   });
 
   final String text;
   final double size;
   final Color? color;
   final FontWeight? weight;
+  final int? maxLines;
+  final TextOverflow overflow;
+  final bool? softWrap;
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
     return Text(
       text,
-      overflow: TextOverflow.ellipsis,
+      maxLines: maxLines,
+      overflow: overflow,
+      softWrap: softWrap,
       style: TextStyle(
         fontFamily: 'SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
         fontSize: size,

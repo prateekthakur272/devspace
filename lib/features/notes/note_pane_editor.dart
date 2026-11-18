@@ -11,6 +11,7 @@ class NotePaneEditor extends StatelessWidget {
     this.existingNote,
     this.initialProjectId,
     this.initialTag,
+    this.initialChecklist = false,
     required this.onClose,
   });
 
@@ -18,16 +19,18 @@ class NotePaneEditor extends StatelessWidget {
   final Note? existingNote;
   final String? initialProjectId;
   final String? initialTag;
+  final bool initialChecklist;
   final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) => NoteComposer(
     // Re-create the composer only when a different note is opened.
-    key: ValueKey(existingNote?.id ?? 'new'),
+    key: ValueKey(existingNote?.id ?? 'new_$initialChecklist'),
     state: state,
     existingNote: existingNote,
     initialProjectId: initialProjectId,
     initialTag: initialTag,
+    initialChecklist: initialChecklist,
     onClose: onClose,
   );
 }

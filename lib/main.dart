@@ -240,16 +240,53 @@ class _DevSpaceAppState extends State<DevSpaceApp>
         : HardwareKeyboard.instance.isControlPressed;
 
     if (isCmdOrCtrl) {
+      final isShift = HardwareKeyboard.instance.isShiftPressed;
+      final isAlt = HardwareKeyboard.instance.isAltPressed;
+
       if (e.logicalKey == LogicalKeyboardKey.keyK) {
         state.paletteOpen = !state.paletteOpen;
         return true;
       }
       if (e.logicalKey == LogicalKeyboardKey.keyN) {
-        state.modal = const ModalAddProject();
+        if (isShift || isAlt) {
+          state.openNewNoteInPane();
+        } else {
+          state.modal = const ModalAddProject();
+        }
+        return true;
+      }
+      if (e.logicalKey == LogicalKeyboardKey.keyO) {
+        state.modal = const ModalCreateGroup();
         return true;
       }
       if (e.logicalKey == LogicalKeyboardKey.keyR) {
         state.refreshAllGit();
+        return true;
+      }
+      if (e.logicalKey == LogicalKeyboardKey.keyB) {
+        if (isShift || isAlt) {
+          state.toggleNotesPane();
+        } else {
+          state.updateUiState((s) => s.copyWith(sidebarVisible: !s.sidebarVisible));
+        }
+        return true;
+      }
+      if (e.logicalKey == LogicalKeyboardKey.digit1) {
+        state.updateUiState((s) => s.copyWith(activeTab: 'projects'));
+        return true;
+      }
+      if (e.logicalKey == LogicalKeyboardKey.digit2) {
+        state.updateUiState((s) => s.copyWith(activeTab: 'git_radar'));
+        return true;
+      }
+      if (e.logicalKey == LogicalKeyboardKey.keyT) {
+        state.updateSettings(
+          state.settings.copyWith(
+            themeMode: state.settings.themeMode == ThemeMode.dark
+                ? ThemeMode.light
+                : ThemeMode.dark,
+          ),
+        );
         return true;
       }
       if (e.logicalKey == LogicalKeyboardKey.comma) {
@@ -272,6 +309,12 @@ class _DevSpaceAppState extends State<DevSpaceApp>
         onClose: quit,
         onDragStart: () => unawaited(wm.windowManager.startDragging()),
         onContextMenu: () => unawaited(wm.windowManager.popUpWindowMenu()),
+        menuBar: WindowMenuBar(
+          state: state,
+          onQuit: quit,
+          onMinimize: minimize,
+          onToggleMaximize: () => unawaited(toggleMaximize()),
+        ),
       );
 
   @override

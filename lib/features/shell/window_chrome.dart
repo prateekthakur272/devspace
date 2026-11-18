@@ -7,12 +7,14 @@ class WindowChrome {
   const WindowChrome({
     this.leftInset = 0,
     this.controls,
+    this.menuBar,
     this.dragArea = _identity,
     this.onDoubleClick,
   });
 
   final double leftInset;
   final Widget? controls;
+  final Widget? menuBar;
   final Widget Function(Widget content) dragArea;
   final VoidCallback? onDoubleClick;
 
@@ -25,6 +27,7 @@ class WindowChrome {
     required VoidCallback onToggleMaximize,
     required VoidCallback onClose,
     required VoidCallback onDragStart,
+    Widget? menuBar,
     VoidCallback? onContextMenu,
   }) =>
       WindowChrome(
@@ -37,6 +40,7 @@ class WindowChrome {
                 onToggleMaximize: onToggleMaximize,
                 onClose: onClose,
               ),
+        menuBar: isMac ? null : menuBar,
         dragArea: (content) => TitleBarDrag(
           onDragStart: onDragStart,
           onContextMenu: onContextMenu,

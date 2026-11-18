@@ -111,7 +111,10 @@ class GitRepoStatus {
   final String? lastCommitMessage;
   final String? lastCommitHash;
   final DateTime? lastCommitDate;
+  final String? lastCommitAuthor;
   final String? lastTag;
+  final String? upstream;
+  final String? remoteUrl;
 
   const GitRepoStatus({
     this.isGitRepo = false,
@@ -127,7 +130,10 @@ class GitRepoStatus {
     this.lastCommitMessage,
     this.lastCommitHash,
     this.lastCommitDate,
+    this.lastCommitAuthor,
     this.lastTag,
+    this.upstream,
+    this.remoteUrl,
   });
 
   bool get isClean =>
@@ -139,6 +145,9 @@ class GitRepoStatus {
   bool get isDirty => isGitRepo && !isClean;
 
   bool get needsSync => isGitRepo && (aheadCount > 0 || behindCount > 0);
+
+  bool get isSynced =>
+      isGitRepo && aheadCount == 0 && behindCount == 0 && upstream != null;
 
   int get totalChanges => modifiedCount + stagedCount + untrackedCount;
 
@@ -490,6 +499,25 @@ class Note {
 
   /// Human-readable body (no markdown markers, no checklist lines) for cards.
   String get plainContent => NoteMarkdown.plain(content);
+
+  /// True when the note has neither title nor meaningful content/checklist.
+  bool get isEmpty {
+    if (title.trim().isNotEmpty) return false;
+    if (checklist.any((c) => c.text.trim().isNotEmpty)) return false;
+    if (links.isNotEmpty) return false;
+    for (final b in NoteMarkdown.parse(content)) {
+      if (b.type == BlockType.todo) {
+        if (b.text.trim().isNotEmpty) return false;
+        continue;
+      }
+      final t = b.text
+          .replaceAll(RegExp(r'@[a-zA-Z0-9_\-]+'), '')
+          .replaceAll(RegExp(r'#[a-zA-Z0-9_\-]+'), '')
+          .trim();
+      if (t.isNotEmpty) return false;
+    }
+    return true;
+  }
 
   Note copyWith({
     String? id,

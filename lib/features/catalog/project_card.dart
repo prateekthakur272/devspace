@@ -211,6 +211,7 @@ class ProjectCard extends StatelessWidget {
                                     size: 15,
                                     weight: FontWeight.w600,
                                     color: p.text,
+                                    maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -303,12 +304,16 @@ class ProjectCard extends StatelessWidget {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              T(
-                                _formatTime(project.lastOpenedAt),
-                                size: 11,
-                                color: p.muted,
+                              Expanded(
+                                child: T(
+                                  _formatTime(project.lastOpenedAt),
+                                  size: 11,
+                                  color: p.muted,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                              const Spacer(),
+                              const SizedBox(width: 4),
                               IconBtn(
                                 icon: AppIcons.folder,
                                 tooltip: Platform.revealLabel,
@@ -333,42 +338,45 @@ class ProjectCard extends StatelessWidget {
                                 onClick: () => state.openNewNoteInPane(initialProjectId: project.id),
                               ),
                               const SizedBox(width: 6),
-                              HoverBuilder(
-                                cursor: SystemMouseCursors.click,
-                                onTap: () => state.launchProject(project),
-                                builder: (context, editorHovered) {
-                                  return Tooltip(
-                                    message: 'Default editor: ${project.defaultEditor.label}\nDouble-click card to open',
-                                    child: Container(
-                                      height: 28,
-                                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                                      decoration: BoxDecoration(
-                                        color: editorHovered ? p.hover : p.field,
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: editorHovered ? p.accent.withOpacity(0.5) : p.border,
-                                          width: 1,
+                              Flexible(
+                                child: HoverBuilder(
+                                  cursor: SystemMouseCursors.click,
+                                  onTap: () => state.launchProject(project),
+                                  builder: (context, editorHovered) {
+                                    return Tooltip(
+                                      message: 'Default editor: ${project.defaultEditor.label}\nDouble-click card to open',
+                                      child: Container(
+                                        height: 28,
+                                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                                        decoration: BoxDecoration(
+                                          color: editorHovered ? p.hover : p.field,
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(
+                                            color: editorHovered ? p.accent.withOpacity(0.5) : p.border,
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            IdeIcon(editor: project.defaultEditor, size: 16),
+                                            const SizedBox(width: 6),
+                                            Flexible(
+                                              child: T(
+                                                project.defaultEditor.label,
+                                                size: 11.5,
+                                                weight: FontWeight.w500,
+                                                color: editorHovered ? p.text : p.muted,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IdeIcon(editor: project.defaultEditor, size: 16),
-                                          const SizedBox(width: 6),
-                                          Flexible(
-                                            child: T(
-                                              project.defaultEditor.label,
-                                              size: 11.5,
-                                              weight: FontWeight.w500,
-                                              color: editorHovered ? p.text : p.muted,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
+                                    );
+                                  },
+                                ),
                               ),
                             ],
                           ),
@@ -411,8 +419,34 @@ class ProjectCard extends StatelessWidget {
       builder: (context, hovered) {
         final hasCommitInfo = gitStatus.lastCommitMessage != null || gitStatus.lastTag != null;
 
+        final buffer = StringBuffer('Branch: ${gitStatus.branch}');
+        if (gitStatus.upstream != null) {
+          buffer.write(' -> ${gitStatus.upstream}');
+        }
+        buffer.writeln();
+        if (gitStatus.isClean) {
+          buffer.write('Status: Clean');
+        } else {
+          buffer.write(
+            'Status: ${gitStatus.totalChanges} uncommitted changes (${gitStatus.stagedCount} staged, ${gitStatus.modifiedCount} modified, ${gitStatus.untrackedCount} untracked)',
+          );
+        }
+        if (gitStatus.aheadCount > 0 || gitStatus.behindCount > 0) {
+          buffer.write('\nSync: ${gitStatus.aheadCount} ahead, ${gitStatus.behindCount} behind');
+        }
+        if (gitStatus.hasStash) {
+          buffer.write('\nStash: Saved changes present');
+        }
+        if (gitStatus.lastCommitMessage != null) {
+          buffer.write('\nLast commit: ${gitStatus.lastCommitHash ?? ""} ${gitStatus.lastCommitMessage!}');
+          if (gitStatus.lastCommitAuthor != null) {
+            buffer.write(' (${gitStatus.lastCommitAuthor})');
+          }
+        }
+        buffer.write('\nClick for full Git health & details');
+
         return Tooltip(
-          message: 'Branch: ${gitStatus.branch}\nClick for full Git details & branch history',
+          message: buffer.toString(),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 140),
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
@@ -422,7 +456,7 @@ class ProjectCard extends StatelessWidget {
                   : (p.dark ? const Color(0xFF16181D) : p.field),
               borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: hovered ? p.accent.withOpacity(0.45) : p.border,
+                color: hovered ? p.accent.withOpacity(0.55) : p.border,
                 width: 1,
               ),
             ),
@@ -433,69 +467,119 @@ class ProjectCard extends StatelessWidget {
                 // Top Row: Branch, Sync Badges, Dirty/Clean Badges
                 Row(
                   children: [
-                    // Branch chip
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: p.accent.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
+                    Expanded(
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(AppIcons.branch, size: 12, color: p.accent),
-                          const SizedBox(width: 4),
-                          ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 120),
-                            child: T(
-                              gitStatus.branch,
-                              size: 11.5,
-                              weight: FontWeight.w600,
-                              color: p.accent,
-                              overflow: TextOverflow.ellipsis,
+                          // Branch chip
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: p.accent.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(color: p.accent.withOpacity(0.25), width: 0.5),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(AppIcons.branch, size: 12, color: p.accent),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(maxWidth: 110),
+                                      child: T(
+                                        gitStatus.branch,
+                                        size: 11.5,
+                                        weight: FontWeight.w600,
+                                        color: p.accent,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
+
+                          // Stash Badge
+                          if (gitStatus.hasStash)
+                            Container(
+                              margin: const EdgeInsets.only(left: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: p.warn.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.inventory_2_outlined, size: 9.5, color: p.warn),
+                                  const SizedBox(width: 2),
+                                  T('stash', size: 9.5, weight: FontWeight.w600, color: p.warn),
+                                ],
+                              ),
+                            ),
+
+                          // Synced indicator
+                          if (gitStatus.isSynced)
+                            Container(
+                              margin: const EdgeInsets.only(left: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: p.ok.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.sync_rounded, size: 9.5, color: p.ok),
+                                  const SizedBox(width: 2),
+                                  T('synced', size: 9.5, weight: FontWeight.w600, color: p.ok),
+                                ],
+                              ),
+                            ),
+
+                          // Ahead / Behind Commits
+                          if (gitStatus.aheadCount > 0)
+                            Container(
+                              margin: const EdgeInsets.only(left: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: p.accent.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.arrow_upward_rounded, size: 10, color: p.accent),
+                                  const SizedBox(width: 1),
+                                  T('${gitStatus.aheadCount}', size: 10, weight: FontWeight.w700, color: p.accent),
+                                ],
+                              ),
+                            ),
+                          if (gitStatus.behindCount > 0)
+                            Container(
+                              margin: const EdgeInsets.only(left: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: p.err.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.arrow_downward_rounded, size: 10, color: p.err),
+                                  const SizedBox(width: 1),
+                                  T('${gitStatus.behindCount}', size: 10, weight: FontWeight.w700, color: p.err),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                     ),
-
-                    // Ahead / Behind Commits
-                    if (gitStatus.aheadCount > 0)
-                      Container(
-                        margin: const EdgeInsets.only(left: 5),
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: p.accent.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.arrow_upward_rounded, size: 10, color: p.accent),
-                            const SizedBox(width: 1),
-                            T('${gitStatus.aheadCount}', size: 10, weight: FontWeight.w700, color: p.accent),
-                          ],
-                        ),
-                      ),
-                    if (gitStatus.behindCount > 0)
-                      Container(
-                        margin: const EdgeInsets.only(left: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: p.err.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.arrow_downward_rounded, size: 10, color: p.err),
-                            const SizedBox(width: 1),
-                            T('${gitStatus.behindCount}', size: 10, weight: FontWeight.w700, color: p.err),
-                          ],
-                        ),
-                      ),
-
-                    const Spacer(),
+                    const SizedBox(width: 6),
 
                     // Status Indicator
                     if (isLoadingGit)
@@ -586,7 +670,7 @@ class ProjectCard extends StatelessWidget {
                   ],
                 ),
 
-                // Bottom Row: Last Commit Message, Hash, Tag, Relative Time
+                // Bottom Row: Last Commit Message, Hash, Tag, Relative Time, Chevron
                 if (hasCommitInfo) ...[
                   const SizedBox(height: 4),
                   DrawTopBorder(
@@ -607,48 +691,87 @@ class ProjectCard extends StatelessWidget {
                                 border: Border.all(color: p.border.withOpacity(0.6), width: 0.5),
                               ),
                               child: MonoText(
-                                gitStatus.lastCommitHash!,
+                                gitStatus.lastCommitHash!.length > 7
+                                    ? gitStatus.lastCommitHash!.substring(0, 7)
+                                    : gitStatus.lastCommitHash!,
                                 size: 9.5,
                                 color: p.muted,
                               ),
                             ),
                             const SizedBox(width: 5),
                           ],
-                          // Tag badge (if available)
-                          if (gitStatus.lastTag != null) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
-                              decoration: BoxDecoration(
-                                color: p.accent.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.sell_outlined, size: 9, color: p.accent),
-                                  const SizedBox(width: 2.5),
-                                  T(
-                                    gitStatus.lastTag!,
-                                    size: 9.5,
-                                    weight: FontWeight.w600,
-                                    color: p.accent,
+                          // Flexible middle section: tag, commit message, author
+                          Expanded(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Tag badge (if available)
+                                if (gitStatus.lastTag != null) ...[
+                                  Flexible(
+                                    flex: gitStatus.lastCommitMessage != null ? 1 : 2,
+                                    child: Tooltip(
+                                      message: 'Tag: ${gitStatus.lastTag!}',
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4.5, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: p.accent.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(3),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.sell_outlined, size: 9, color: p.accent),
+                                            const SizedBox(width: 2.5),
+                                            Flexible(
+                                              child: ConstrainedBox(
+                                                constraints: const BoxConstraints(maxWidth: 85),
+                                                child: T(
+                                                  gitStatus.lastTag!,
+                                                  size: 9.5,
+                                                  weight: FontWeight.w600,
+                                                  color: p.accent,
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  if (gitStatus.lastCommitMessage != null) const SizedBox(width: 5),
+                                ],
+                                // Commit message & author
+                                if (gitStatus.lastCommitMessage != null)
+                                  Flexible(
+                                    flex: 2,
+                                    child: T(
+                                      gitStatus.lastCommitMessage!,
+                                      size: 11,
+                                      color: p.text.withOpacity(0.85),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                if (gitStatus.lastCommitAuthor != null) ...[
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: ConstrainedBox(
+                                      constraints: const BoxConstraints(maxWidth: 75),
+                                      child: T(
+                                        '• ${gitStatus.lastCommitAuthor}',
+                                        size: 9.5,
+                                        color: p.muted.withOpacity(0.75),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                                   ),
                                 ],
-                              ),
+                              ],
                             ),
-                            const SizedBox(width: 5),
-                          ],
-                          // Commit message
-                          if (gitStatus.lastCommitMessage != null)
-                            Expanded(
-                              child: T(
-                                gitStatus.lastCommitMessage!,
-                                size: 11,
-                                color: p.text.withOpacity(0.85),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
+                          ),
                           // Relative time
                           if (gitStatus.lastCommitDate != null)
                             Padding(
@@ -657,6 +780,15 @@ class ProjectCard extends StatelessWidget {
                                 _formatTime(gitStatus.lastCommitDate!),
                                 size: 9.5,
                                 color: p.muted,
+                              ),
+                            ),
+                          if (hovered)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Icon(
+                                Icons.chevron_right_rounded,
+                                size: 13,
+                                color: p.accent,
                               ),
                             ),
                         ],

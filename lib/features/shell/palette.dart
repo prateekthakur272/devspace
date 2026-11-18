@@ -125,6 +125,17 @@ class _CommandPaletteState extends State<CommandPalette> {
     ));
 
     list.add(_PaletteItem(
+      title: 'Welcome & Onboarding Tour',
+      subtitle: 'Explore features, customize IDE, and set up your workspace',
+      category: 'Actions',
+      icon: Icons.explore_outlined,
+      action: () {
+        state.paletteOpen = false;
+        state.modal = const ModalOnboarding();
+      },
+    ));
+
+    list.add(_PaletteItem(
       title: 'Switch to Combined Git Radar',
       subtitle: 'View all repository statuses across your workspace',
       category: 'Actions',

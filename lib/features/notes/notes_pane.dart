@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:devspace/app/app_state.dart';
 import 'package:devspace/components/buttons.dart';
 import 'package:devspace/components/modifiers.dart';
@@ -8,7 +7,6 @@ import 'package:devspace/core/model/note_markdown.dart';
 import 'package:devspace/core/model/models.dart';
 import 'package:devspace/features/notes/note_card.dart';
 import 'package:devspace/features/notes/note_pane_editor.dart';
-import 'package:devspace/features/notes/note_theme.dart';
 import 'package:devspace/platform/platform.dart';
 import 'package:devspace/theme/icons.dart';
 import 'package:devspace/theme/theme.dart';
@@ -29,17 +27,6 @@ class _NotesPaneState extends State<NotesPane> {
   String? _selectedProjectId;
   late final TextEditingController _searchCtrl;
 
-  // Inline Quick-Note Creator State (Google Keep / Samsung Notes)
-  bool _isCreating = false;
-  bool _checklistMode = false;
-  final TextEditingController _createTitleCtrl = TextEditingController();
-  final TextEditingController _createContentCtrl = TextEditingController();
-  final TextEditingController _createChecklistCtrl = TextEditingController();
-  final List<ChecklistItem> _createChecklist = [];
-  final List<String> _createProjectIds = [];
-  bool _createPinned = false;
-  Color? _createColor;
-
   @override
   void initState() {
     super.initState();
@@ -49,62 +36,7 @@ class _NotesPaneState extends State<NotesPane> {
   @override
   void dispose() {
     _searchCtrl.dispose();
-    _createTitleCtrl.dispose();
-    _createContentCtrl.dispose();
-    _createChecklistCtrl.dispose();
     super.dispose();
-  }
-
-  void _resetCreator() {
-    setState(() {
-      _isCreating = false;
-      _checklistMode = false;
-      _createTitleCtrl.clear();
-      _createContentCtrl.clear();
-      _createChecklistCtrl.clear();
-      _createChecklist.clear();
-      _createProjectIds.clear();
-      _createPinned = false;
-      _createColor = null;
-    });
-  }
-
-  void _submitInlineNote() {
-    final title = _createTitleCtrl.text.trim();
-    final content = _createContentCtrl.text.trim();
-
-    if (title.isEmpty && content.isEmpty && _createChecklist.isEmpty) {
-      _resetCreator();
-      return;
-    }
-
-    final newNote = Note(
-      id: 'note_${DateTime.now().microsecondsSinceEpoch}',
-      title: title.isEmpty ? (content.isNotEmpty ? '' : 'Untitled Note') : title,
-      content: content,
-      checklist: List.from(_createChecklist),
-      projectIds: List.from(_createProjectIds),
-      pinned: _createPinned,
-      color: _createColor,
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-
-    widget.state.addNote(newNote);
-    _resetCreator();
-  }
-
-  void _addInlineChecklistItem() {
-    final text = _createChecklistCtrl.text.trim();
-    if (text.isEmpty) return;
-    setState(() {
-      _createChecklist.add(ChecklistItem(
-        id: 'chk_${DateTime.now().microsecondsSinceEpoch}',
-        text: text,
-        checked: false,
-      ));
-      _createChecklistCtrl.clear();
-    });
   }
 
   String _formatTime(DateTime time) {
@@ -205,6 +137,7 @@ class _NotesPaneState extends State<NotesPane> {
         existingNote: widget.state.paneEditingNote,
         initialProjectId: widget.state.paneInitialProjectId ?? _selectedProjectId,
         initialTag: widget.state.paneInitialTag,
+        initialChecklist: widget.state.paneInitialChecklist,
         onClose: () => widget.state.closePaneNoteEditor(),
       );
     }
@@ -363,17 +296,17 @@ class _NotesPaneState extends State<NotesPane> {
             ),
           ),
 
-          // Google Keep / Samsung Notes Inline Note Creator ("Take a note...")
+          // Quick Note Launcher Bar ("Take a note...")
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            child: _buildInlineCreator(context, p),
+            child: _buildQuickNoteBar(context, p),
           ),
 
-          // Notes List (Google Keep & Samsung Notes Layout)
+          // Notes List
           Expanded(
-            child: totalNotesCount == 0 && !_isCreating
+            child: totalNotesCount == 0
                 ? _buildEmpty(context, p)
-                : allFiltered.isEmpty && !_isCreating
+                : allFiltered.isEmpty
                     ? Center(
                         child: T('No matching notes found', size: 12, color: p.muted),
                       )
@@ -433,350 +366,64 @@ class _NotesPaneState extends State<NotesPane> {
     );
   }
 
-  // Google Keep / Samsung Notes Inline Creator Bar
-  Widget _buildInlineCreator(BuildContext context, Pal p) {
-    if (!_isCreating) {
-      // Collapsed State: "Take a note…"
-      return ClickableNoRipple(
-        onClick: () => setState(() => _isCreating = true),
-        child: Container(
-          height: 38,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: p.field,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: p.border.withOpacity(0.8), width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(p.dark ? 0.2 : 0.04),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-            ],
+  // Quick Note Launcher Bar: Starts note creation directly in the Note Editor
+  Widget _buildQuickNoteBar(BuildContext context, Pal p) {
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: p.field,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: p.border.withOpacity(0.8), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(p.dark ? 0.2 : 0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
           ),
-          child: Row(
-            children: [
-              T('Take a note…', size: 12.5, color: p.muted),
-              const Spacer(),
-              IconBtn(
-                icon: AppIcons.checklist,
-                tooltip: 'New checklist',
-                size: 26,
-                iconSize: 14,
-                onClick: () {
-                  setState(() {
-                    _isCreating = true;
-                    _checklistMode = true;
-                  });
-                },
-              ),
-              const SizedBox(width: 4),
-              IconBtn(
-                icon: AppIcons.project,
-                tooltip: 'Link project',
-                size: 26,
-                iconSize: 13,
-                onClick: () {
-                  setState(() {
-                    _isCreating = true;
-                  });
-                },
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // Expanded State: Full Rich Inline Note Creator
-    final theme = getThemeForColor(_createColor);
-    final creatorBg = theme != null ? theme.surface(p.dark) : p.field;
-
-    return Focus(
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent &&
-            event.logicalKey == LogicalKeyboardKey.enter &&
-            (HardwareKeyboard.instance.isMetaPressed ||
-                HardwareKeyboard.instance.isControlPressed)) {
-          _submitInlineNote();
-          return KeyEventResult.handled;
-        }
-        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.escape) {
-          _resetCreator();
-          return KeyEventResult.handled;
-        }
-        return KeyEventResult.ignored;
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: creatorBg,
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: _createColor ?? p.accent.withOpacity(0.55),
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(p.dark ? 0.35 : 0.08),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Title & Pin
-            Row(
+          onTap: () {
+            widget.state.openNewNoteInPane(
+              initialProjectId: _selectedProjectId,
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _createTitleCtrl,
-                    autofocus: true,
-                    style: TextStyle(
-                      color: p.text,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    decoration: InputDecoration.collapsed(
-                      hintText: 'Title',
-                      hintStyle: TextStyle(
-                        color: p.muted,
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                IconBtn(
-                  icon: _createPinned ? AppIcons.pin : AppIcons.unpin,
-                  size: 24,
-                  iconSize: 13,
-                  color: _createPinned ? p.accent : p.muted,
-                  tooltip: _createPinned ? 'Unpin' : 'Pin to top',
-                  onClick: () => setState(() => _createPinned = !_createPinned),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Freeform Note Content
-            Container(
-              constraints: const BoxConstraints(minHeight: 50, maxHeight: 120),
-              child: TextField(
-                controller: _createContentCtrl,
-                maxLines: null,
-                style: TextStyle(color: p.text, fontSize: 12.5, height: 1.35),
-                decoration: InputDecoration.collapsed(
-                  hintText: 'Take a note…',
-                  hintStyle: TextStyle(color: p.muted, fontSize: 12.5),
-                ),
-              ),
-            ),
-
-            // Live Checklist Items if in Checklist Mode
-            if (_checklistMode || _createChecklist.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              for (int i = 0; i < _createChecklist.length; i++) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
-                    children: [
-                      ClickableNoRipple(
-                        onClick: () {
-                          setState(() {
-                            _createChecklist[i] = _createChecklist[i].copyWith(
-                              checked: !_createChecklist[i].checked,
-                            );
-                          });
-                        },
-                        child: Icon(
-                          _createChecklist[i].checked
-                              ? Icons.check_box_rounded
-                              : Icons.check_box_outline_blank_rounded,
-                          size: 14,
-                          color: _createChecklist[i].checked ? p.accent : p.muted,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          _createChecklist[i].text,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _createChecklist[i].checked ? p.muted : p.text,
-                            decoration: _createChecklist[i].checked
-                                ? TextDecoration.lineThrough
-                                : null,
-                          ),
-                        ),
-                      ),
-                      IconBtn(
-                        icon: AppIcons.close,
-                        size: 18,
-                        iconSize: 10,
-                        onClick: () => setState(() => _createChecklist.removeAt(i)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              // Add checklist item field
-              Row(
-                children: [
-                  Icon(Icons.add_rounded, size: 14, color: p.muted),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: TextField(
-                      controller: _createChecklistCtrl,
-                      onSubmitted: (_) => _addInlineChecklistItem(),
-                      style: TextStyle(color: p.text, fontSize: 12),
-                      decoration: InputDecoration.collapsed(
-                        hintText: 'List item (Press Enter to add)…',
-                        hintStyle: TextStyle(color: p.muted, fontSize: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-
-            // Project Selector Chips
-            if (widget.state.projects.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final pr in widget.state.projects) ...[
-                      ClickableNoRipple(
-                        onClick: () {
-                          setState(() {
-                            if (_createProjectIds.contains(pr.id)) {
-                              _createProjectIds.remove(pr.id);
-                            } else {
-                              _createProjectIds.add(pr.id);
-                            }
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          margin: const EdgeInsets.only(right: 4),
-                          decoration: BoxDecoration(
-                            color: _createProjectIds.contains(pr.id)
-                                ? p.accent.withOpacity(0.2)
-                                : p.panel,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                              color: _createProjectIds.contains(pr.id)
-                                  ? p.accent
-                                  : p.border.withOpacity(0.6),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 5,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                  color: pr.techStack.color,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              T(
-                                pr.name,
-                                size: 10,
-                                weight: _createProjectIds.contains(pr.id)
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                                color: _createProjectIds.contains(pr.id) ? p.text : p.muted,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 10),
-
-            // Bottom Action Bar (Colors + Checklist Toggle + Done Button)
-            Row(
-              children: [
-                // Color dots (Keep Palette)
-                for (final cOption in kNoteColorThemes.take(6)) ...[
-                  ClickableNoRipple(
-                    onClick: () => setState(() => _createColor = cOption.accent),
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      margin: const EdgeInsets.only(right: 5),
-                      decoration: BoxDecoration(
-                        color: cOption.surface(p.dark),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: _createColor?.value == cOption.accent.value
-                              ? p.accent
-                              : cOption.accent.withOpacity(0.5),
-                          width: _createColor?.value == cOption.accent.value ? 2 : 1,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-                // Reset color dot
-                ClickableNoRipple(
-                  onClick: () => setState(() => _createColor = null),
-                  child: Container(
-                    width: 16,
-                    height: 16,
-                    margin: const EdgeInsets.only(right: 6),
-                    decoration: BoxDecoration(
-                      color: p.panel,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: _createColor == null ? p.accent : p.border,
-                        width: _createColor == null ? 2 : 1,
-                      ),
-                    ),
-                    child: Center(
-                      child: Icon(Icons.close, size: 9, color: p.muted),
-                    ),
-                  ),
-                ),
-                // Checklist toggle
+                T('Take a note…', size: 12.5, color: p.muted),
+                const Spacer(),
                 IconBtn(
                   icon: AppIcons.checklist,
-                  size: 22,
+                  tooltip: 'New checklist note',
+                  size: 26,
+                  iconSize: 14,
+                  onClick: () {
+                    widget.state.openNewNoteInPane(
+                      initialProjectId: _selectedProjectId,
+                      initialChecklist: true,
+                    );
+                  },
+                ),
+                const SizedBox(width: 4),
+                IconBtn(
+                  icon: AppIcons.project,
+                  tooltip: 'New project note',
+                  size: 26,
                   iconSize: 13,
-                  active: _checklistMode,
-                  tooltip: 'Checklist mode',
-                  onClick: () => setState(() => _checklistMode = !_checklistMode),
-                ),
-                const Spacer(),
-                Btn(
-                  label: 'Cancel',
-                  height: 26,
-                  onClick: _resetCreator,
-                ),
-                const SizedBox(width: 6),
-                Btn(
-                  label: 'Done',
-                  primary: true,
-                  height: 26,
-                  onClick: _submitInlineNote,
+                  onClick: () {
+                    widget.state.openNewNoteInPane(
+                      initialProjectId: _selectedProjectId,
+                    );
+                  },
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -804,10 +451,22 @@ class _NotesPaneState extends State<NotesPane> {
             const T('Notes & scratchpad', size: 14, weight: FontWeight.w600),
             const SizedBox(height: 6),
             T(
-              'Capture thoughts, commands, checklists, and project tasks using the bar above.',
+              'Capture thoughts, commands, checklists, and project tasks.',
               size: 11.5,
               color: p.muted,
               align: TextAlign.center,
+            ),
+            const SizedBox(height: 14),
+            Btn(
+              label: 'Create Note',
+              icon: AppIcons.add,
+              primary: true,
+              height: 30,
+              onClick: () {
+                widget.state.openNewNoteInPane(
+                  initialProjectId: _selectedProjectId,
+                );
+              },
             ),
           ],
         ),

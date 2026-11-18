@@ -123,29 +123,46 @@ class NoteCard extends StatelessWidget {
     );
   }
 
-  /// Header row: project badges on the left, pin + menu on the right.
+  /// Header row: project badges on the left, pin + menu on the right end.
   Widget _header(BuildContext context, Pal p, Color accent) {
     final projects =
         [for (final id in note.projectIds) _project(id)].whereType<Project>().toList();
     return Padding(
-      padding: const EdgeInsets.only(left: 12, right: 8, top: 8),
+      padding: const EdgeInsets.only(left: 12, right: 6, top: 6),
       child: Row(
         children: [
-          if (projects.isEmpty)
-            Icon(AppIcons.note, size: 13, color: p.muted)
-          else
-            for (final pr in projects.take(2))
-              Flexible(
-                child: _pill(p, pr.name, pr.techStack.color,
-                    dot: true,
-                    onTap: onSelectProject == null ? null : () => onSelectProject!(pr.id)),
-              ),
-          if (projects.length > 2)
-            Padding(
-              padding: const EdgeInsets.only(left: 4),
-              child: T('+${projects.length - 2}', size: 10.5, color: p.muted),
+          Expanded(
+            child: Row(
+              children: [
+                if (projects.isEmpty)
+                  Icon(AppIcons.note, size: 13, color: p.muted)
+                else ...[
+                  for (final pr in projects.take(2))
+                    Flexible(
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: _pill(
+                          p,
+                          pr.name,
+                          pr.techStack.color,
+                          dot: true,
+                          maxWidth: 140,
+                          onTap: onSelectProject == null
+                              ? null
+                              : () => onSelectProject!(pr.id),
+                        ),
+                      ),
+                    ),
+                  if (projects.length > 2)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 2, right: 4),
+                      child: T('+${projects.length - 2}', size: 10.5, color: p.muted),
+                    ),
+                ],
+              ],
             ),
-          const Spacer(),
+          ),
+          const SizedBox(width: 4),
           IconBtn(
             icon: note.pinned ? AppIcons.pin : AppIcons.unpin,
             size: 24,
@@ -366,8 +383,16 @@ class NoteCard extends StatelessWidget {
     );
   }
 
-  Widget _pill(Pal p, String label, Color color, {bool dot = false, VoidCallback? onTap}) {
-    final child = Container(
+  Widget _pill(
+    Pal p,
+    String label,
+    Color color, {
+    bool dot = false,
+    VoidCallback? onTap,
+    double maxWidth = 110,
+  }) {
+    final pillContent = Container(
+      constraints: BoxConstraints(maxWidth: maxWidth),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withOpacity(0.14),
@@ -378,16 +403,35 @@ class NoteCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (dot) ...[
-            Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
             const SizedBox(width: 5),
           ],
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 110),
-            child: T(label, size: 10.5, weight: FontWeight.w600, color: color, maxLines: 1),
+          Flexible(
+            child: T(
+              label,
+              size: 10.5,
+              weight: FontWeight.w600,
+              color: color,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
     );
-    return onTap == null ? child : ClickableNoRipple(onClick: onTap, child: child);
+
+    final wrapped = Tooltip(
+      message: label,
+      waitDuration: const Duration(milliseconds: 500),
+      child: pillContent,
+    );
+
+    return onTap == null
+        ? wrapped
+        : ClickableNoRipple(onClick: onTap, child: wrapped);
   }
 }
