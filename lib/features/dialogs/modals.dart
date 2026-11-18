@@ -939,6 +939,142 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         ),
         const SizedBox(height: 16),
 
+        // Default Terminal Selection
+        const T('Default Terminal', size: 12.5, weight: FontWeight.w700),
+        const SizedBox(height: 4),
+        T(
+          'Choose whether terminal actions and project shortcuts open in the integrated panel or an external system terminal.',
+          size: 11.5,
+          color: p.muted,
+        ),
+        const SizedBox(height: 10),
+
+        Row(
+          children: [
+            // 1. Integrated Terminal
+            Expanded(
+              child: HoverBuilder(
+                cursor: SystemMouseCursors.click,
+                onTap: () => _updateSettings((s) => s.copyWith(defaultTerminal: DefaultTerminalType.integrated)),
+                builder: (context, hovered) {
+                  final isSelected = settings.defaultTerminal == DefaultTerminalType.integrated;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? p.accent.withOpacity(0.12)
+                          : hovered
+                              ? p.hover
+                              : p.field,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isSelected
+                            ? p.accent
+                            : hovered
+                                ? p.accent.withOpacity(0.4)
+                                : p.border,
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(AppIcons.terminal, size: 18, color: isSelected ? p.accent : p.muted),
+                            const Spacer(),
+                            if (isSelected)
+                              Icon(Icons.check_circle_rounded, size: 15, color: p.accent),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        T(
+                          'Integrated Terminal',
+                          size: 12.5,
+                          weight: FontWeight.w700,
+                          color: isSelected ? p.accent : p.text,
+                        ),
+                        const SizedBox(height: 2),
+                        T(
+                          'DevSpace built-in bottom panel with tabs, ANSI styling & command suggestions',
+                          size: 10.5,
+                          color: p.muted,
+                          overflow: TextOverflow.visible,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+
+            // 2. System Terminal
+            Expanded(
+              child: HoverBuilder(
+                cursor: SystemMouseCursors.click,
+                onTap: () => _updateSettings((s) => s.copyWith(defaultTerminal: DefaultTerminalType.system)),
+                builder: (context, hovered) {
+                  final isSelected = settings.defaultTerminal == DefaultTerminalType.system;
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? p.accent.withOpacity(0.12)
+                          : hovered
+                              ? p.hover
+                              : p.field,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isSelected
+                            ? p.accent
+                            : hovered
+                                ? p.accent.withOpacity(0.4)
+                                : p.border,
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.open_in_new_rounded, size: 18, color: isSelected ? p.accent : p.muted),
+                            const Spacer(),
+                            if (isSelected)
+                              Icon(Icons.check_circle_rounded, size: 15, color: p.accent),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        T(
+                          'System Terminal',
+                          size: 12.5,
+                          weight: FontWeight.w700,
+                          color: isSelected ? p.accent : p.text,
+                        ),
+                        const SizedBox(height: 2),
+                        T(
+                          Platform.isMac
+                              ? 'Native macOS Terminal, iTerm2, Warp, or Ghostty application'
+                              : (Platform.isWindows
+                                  ? 'Native Windows Terminal, PowerShell, or cmd.exe'
+                                  : 'Native Linux desktop terminal emulator'),
+                          size: 10.5,
+                          color: p.muted,
+                          overflow: TextOverflow.visible,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+
         const T('Default Code Editor', size: 12.5, weight: FontWeight.w700),
         const SizedBox(height: 4),
         T(
@@ -1619,7 +1755,7 @@ class _GitDetailsDialogState extends State<_GitDetailsDialog> {
           icon: AppIcons.terminal,
           label: 'Terminal',
           height: 32,
-          onClick: () => Platform.openInTerminal(widget.project.path),
+          onClick: () => widget.state.openTerminal(widget.project.path, title: widget.project.name),
         ),
         Btn(
           icon: Icons.sync_alt_rounded,

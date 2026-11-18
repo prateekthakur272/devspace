@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io';
+import 'dart:io' hide Platform;
 import 'package:flutter/widgets.dart';
 import 'package:devspace/app/modal.dart';
 import 'package:devspace/core/git/git_service.dart';
@@ -8,9 +8,11 @@ import 'package:devspace/core/logging/log.dart';
 import 'package:devspace/core/model/note_markdown.dart';
 import 'package:devspace/core/model/models.dart';
 import 'package:devspace/core/storage/storage.dart';
+import 'package:devspace/core/terminal/terminal_controller.dart';
 import 'package:devspace/core/tools/app_icon_service.dart';
 import 'package:devspace/core/tools/desktop_app_service.dart';
 import 'package:devspace/core/tools/tool_detection_service.dart';
+import 'package:devspace/platform/platform.dart';
 
 export 'package:devspace/app/modal.dart';
 
@@ -41,6 +43,7 @@ class AppState with ChangeNotifier {
   String? _availableUpdate;
   String? _toast;
   Timer? _toastTimer;
+  late final TerminalController terminalController;
 
   // Getters
   List<Project> get projects => List.unmodifiable(_projects);
@@ -103,6 +106,13 @@ class AppState with ChangeNotifier {
     _workspaces = AppStore.loadWorkspaces().toList();
     _notes = AppStore.loadNotes().where((n) => !n.isEmpty).toList();
     _uiState = AppStore.loadState();
+    terminalController = TerminalController();
+    terminalController.addListener(notifyListeners);
+    terminalController.onAllSessionsClosed = () {
+      if (_uiState.terminalVisible) {
+        toggleTerminal(false);
+      }
+    };
 
     // Start background git status polling
     _scheduleGitPolling();
@@ -239,6 +249,8 @@ class AppState with ChangeNotifier {
     _disposed = true;
     _gitPollTimer?.cancel();
     _toastTimer?.cancel();
+    terminalController.removeListener(notifyListeners);
+    terminalController.dispose();
     super.dispose();
   }
 
@@ -585,6 +597,59 @@ class AppState with ChangeNotifier {
     _uiState = _uiState.copyWith(notesPaneWidth: w);
     AppStore.saveState(_uiState);
     notifyListeners();
+  }
+
+  bool get terminalVisible => _uiState.terminalVisible;
+  double get terminalHeight => _uiState.terminalHeight;
+
+  void toggleTerminal([bool? visible]) {
+    final nextVisible = visible ?? !_uiState.terminalVisible;
+    if (nextVisible && terminalController.sessions.isEmpty) {
+      terminalController.createSession();
+    }
+    _uiState = _uiState.copyWith(
+      terminalVisible: nextVisible,
+    );
+    AppStore.saveState(_uiState);
+    notifyListeners();
+  }
+
+  void closeAllTerminals() {
+    terminalController.closeAllSessions();
+  }
+
+  void setTerminalHeight(double h) {
+    _uiState = _uiState.copyWith(
+      terminalHeight: h.clamp(140.0, 600.0),
+    );
+    AppStore.saveState(_uiState);
+    notifyListeners();
+  }
+
+  void openTerminal(String dirPath, {String? title}) {
+    if (settings.defaultTerminal == DefaultTerminalType.system) {
+      Platform.openInTerminal(dirPath);
+    } else {
+      _uiState = _uiState.copyWith(terminalVisible: true);
+      AppStore.saveState(_uiState);
+      terminalController.openDirectory(dirPath, title: title);
+      notifyListeners();
+    }
+  }
+
+  void openIntegratedTerminal(String dirPath, {String? title}) {
+    _uiState = _uiState.copyWith(terminalVisible: true);
+    AppStore.saveState(_uiState);
+    terminalController.openDirectory(dirPath, title: title);
+    notifyListeners();
+  }
+
+  void openSystemTerminal(String dirPath) {
+    Platform.openInTerminal(dirPath);
+  }
+
+  void openTerminalInProject(Project project) {
+    openTerminal(project.path, title: project.name);
   }
 
   // --- In-Pane Note Editor State ---

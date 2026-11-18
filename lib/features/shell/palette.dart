@@ -171,6 +171,44 @@ class _CommandPaletteState extends State<CommandPalette> {
     ));
 
     list.add(_PaletteItem(
+      title: 'Toggle Integrated Terminal',
+      subtitle: state.terminalVisible
+          ? 'Hide the VS Code-style bottom terminal panel'
+          : 'Open the VS Code-style bottom terminal panel',
+      category: 'Terminal',
+      icon: AppIcons.terminal,
+      badge: Platform.isMac ? '⌘`' : 'Ctrl+`',
+      action: () {
+        state.paletteOpen = false;
+        state.toggleTerminal();
+      },
+    ));
+
+    list.add(_PaletteItem(
+      title: 'Terminal: New Tab Session',
+      subtitle: 'Create a new terminal session in working directory',
+      category: 'Terminal',
+      icon: AppIcons.add,
+      action: () {
+        state.paletteOpen = false;
+        state.toggleTerminal(true);
+        state.terminalController.createSession();
+      },
+    ));
+
+    list.add(_PaletteItem(
+      title: 'Terminal: Clear Output Buffer',
+      subtitle: 'Clear screen and output history for active session',
+      category: 'Terminal',
+      icon: AppIcons.delete,
+      badge: Platform.isMac ? '⌘K' : 'Ctrl+L',
+      action: () {
+        state.paletteOpen = false;
+        state.terminalController.activeSession.clear();
+      },
+    ));
+
+    list.add(_PaletteItem(
       title: 'Toggle Tools & IDEs Rail',
       subtitle: state.settings.showToolsRail
           ? 'Hide the right launcher rail for installed tools and editors'
@@ -249,13 +287,32 @@ class _CommandPaletteState extends State<CommandPalette> {
       ));
 
       list.add(_PaletteItem(
-        title: 'Open ${p.name} in Terminal',
+        title: 'Open ${p.name} in ${state.settings.defaultTerminal.label}',
         subtitle: p.path,
         category: 'Projects',
         icon: AppIcons.terminal,
         action: () {
           state.paletteOpen = false;
-          Platform.openInTerminal(p.path);
+          state.openTerminal(p.path, title: p.name);
+        },
+      ));
+
+      list.add(_PaletteItem(
+        title: state.settings.defaultTerminal == DefaultTerminalType.integrated
+            ? 'Open ${p.name} in System Terminal'
+            : 'Open ${p.name} in Integrated Terminal',
+        subtitle: p.path,
+        category: 'Projects',
+        icon: state.settings.defaultTerminal == DefaultTerminalType.integrated
+            ? AppIcons.external
+            : AppIcons.terminal,
+        action: () {
+          state.paletteOpen = false;
+          if (state.settings.defaultTerminal == DefaultTerminalType.integrated) {
+            state.openSystemTerminal(p.path);
+          } else {
+            state.openIntegratedTerminal(p.path, title: p.name);
+          }
         },
       ));
 

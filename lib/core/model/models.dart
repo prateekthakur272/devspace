@@ -354,10 +354,30 @@ class PinnedApp {
   }
 }
 
+/// Terminal preference option (Integrated DevSpace panel vs. External OS app).
+enum DefaultTerminalType {
+  integrated('integrated', 'Integrated Terminal', 'DevSpace built-in bottom terminal panel'),
+  system('system', 'System Terminal', 'External OS terminal application');
+
+  const DefaultTerminalType(this.id, this.label, this.description);
+  final String id;
+  final String label;
+  final String description;
+
+  bool get isIntegrated => this == DefaultTerminalType.integrated;
+  bool get isSystem => this == DefaultTerminalType.system;
+
+  static DefaultTerminalType fromId(String? id) {
+    if (id == 'system') return DefaultTerminalType.system;
+    return DefaultTerminalType.integrated;
+  }
+}
+
 /// App settings.
 class AppSettings {
   final ThemeMode themeMode;
   final EditorType defaultEditor;
+  final DefaultTerminalType defaultTerminal;
   final String terminalEmulator;
   final int gitRefreshIntervalSeconds;
   final bool autoDetectProjects;
@@ -367,6 +387,7 @@ class AppSettings {
   const AppSettings({
     this.themeMode = ThemeMode.system,
     this.defaultEditor = EditorType.vscode,
+    this.defaultTerminal = DefaultTerminalType.integrated,
     this.terminalEmulator = 'default',
     this.gitRefreshIntervalSeconds = 30,
     this.autoDetectProjects = true,
@@ -377,6 +398,7 @@ class AppSettings {
   AppSettings copyWith({
     ThemeMode? themeMode,
     EditorType? defaultEditor,
+    DefaultTerminalType? defaultTerminal,
     String? terminalEmulator,
     int? gitRefreshIntervalSeconds,
     bool? autoDetectProjects,
@@ -386,6 +408,7 @@ class AppSettings {
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
         defaultEditor: defaultEditor ?? this.defaultEditor,
+        defaultTerminal: defaultTerminal ?? this.defaultTerminal,
         terminalEmulator: terminalEmulator ?? this.terminalEmulator,
         gitRefreshIntervalSeconds:
             gitRefreshIntervalSeconds ?? this.gitRefreshIntervalSeconds,
@@ -397,6 +420,7 @@ class AppSettings {
   Map<String, dynamic> toJson() => {
         'themeMode': themeMode.name,
         'defaultEditor': defaultEditor.name,
+        'defaultTerminal': defaultTerminal.id,
         'terminalEmulator': terminalEmulator,
         'gitRefreshIntervalSeconds': gitRefreshIntervalSeconds,
         'autoDetectProjects': autoDetectProjects,
@@ -412,6 +436,7 @@ class AppSettings {
         orElse: () => ThemeMode.system,
       ),
       defaultEditor: EditorType.fromId(m['defaultEditor'] as String?),
+      defaultTerminal: DefaultTerminalType.fromId(m['defaultTerminal'] as String?),
       terminalEmulator: m['terminalEmulator'] as String? ?? 'default',
       gitRefreshIntervalSeconds:
           (m['gitRefreshIntervalSeconds'] as num?)?.toInt() ?? 30,
@@ -649,6 +674,8 @@ class SavedState {
   final bool sidebarVisible;
   final double notesPaneWidth;
   final bool notesPaneVisible;
+  final double terminalHeight;
+  final bool terminalVisible;
   final String activeTab;
   final String selectedWorkspaceId;
   final String? activeTagFilter;
@@ -661,6 +688,8 @@ class SavedState {
     this.sidebarVisible = true,
     this.notesPaneWidth = 320,
     this.notesPaneVisible = true,
+    this.terminalHeight = 250,
+    this.terminalVisible = false,
     this.activeTab = 'projects', // 'projects' | 'git_radar'
     this.selectedWorkspaceId = 'all',
     this.activeTagFilter,
@@ -674,6 +703,8 @@ class SavedState {
     bool? sidebarVisible,
     double? notesPaneWidth,
     bool? notesPaneVisible,
+    double? terminalHeight,
+    bool? terminalVisible,
     String? activeTab,
     String? selectedWorkspaceId,
     String? activeTagFilter,
@@ -687,6 +718,8 @@ class SavedState {
         sidebarVisible: sidebarVisible ?? this.sidebarVisible,
         notesPaneWidth: notesPaneWidth ?? this.notesPaneWidth,
         notesPaneVisible: notesPaneVisible ?? this.notesPaneVisible,
+        terminalHeight: terminalHeight ?? this.terminalHeight,
+        terminalVisible: terminalVisible ?? this.terminalVisible,
         activeTab: activeTab ?? this.activeTab,
         selectedWorkspaceId: selectedWorkspaceId ?? this.selectedWorkspaceId,
         activeTagFilter: clearTagFilter ? null : (activeTagFilter ?? this.activeTagFilter),
@@ -700,6 +733,8 @@ class SavedState {
         'sidebarVisible': sidebarVisible,
         'notesPaneWidth': notesPaneWidth,
         'notesPaneVisible': notesPaneVisible,
+        'terminalHeight': terminalHeight,
+        'terminalVisible': terminalVisible,
         'activeTab': activeTab,
         'selectedWorkspaceId': selectedWorkspaceId,
         if (activeTagFilter != null) 'activeTagFilter': activeTagFilter,
@@ -715,6 +750,8 @@ class SavedState {
       sidebarVisible: m['sidebarVisible'] as bool? ?? true,
       notesPaneWidth: (m['notesPaneWidth'] as num?)?.toDouble() ?? 320,
       notesPaneVisible: m['notesPaneVisible'] as bool? ?? true,
+      terminalHeight: (m['terminalHeight'] as num?)?.toDouble() ?? 250,
+      terminalVisible: m['terminalVisible'] as bool? ?? false,
       activeTab: m['activeTab'] as String? ?? 'projects',
       selectedWorkspaceId: m['selectedWorkspaceId'] as String? ?? 'all',
       activeTagFilter: m['activeTagFilter'] as String?,

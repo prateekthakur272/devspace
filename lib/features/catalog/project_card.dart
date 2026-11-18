@@ -56,9 +56,24 @@ class ProjectCard extends StatelessWidget {
           action: () => Platform.reveal(project.path),
         ),
         ContextMenuItem(
-          label: 'Open in Terminal',
+          label: 'Open in ${state.settings.defaultTerminal.label}',
           icon: AppIcons.terminal,
-          action: () => Platform.openInTerminal(project.path),
+          action: () => state.openTerminal(project.path, title: project.name),
+        ),
+        ContextMenuItem(
+          label: state.settings.defaultTerminal == DefaultTerminalType.integrated
+              ? 'Open in System Terminal'
+              : 'Open in Integrated Terminal',
+          icon: state.settings.defaultTerminal == DefaultTerminalType.integrated
+              ? AppIcons.external
+              : AppIcons.terminal,
+          action: () {
+            if (state.settings.defaultTerminal == DefaultTerminalType.integrated) {
+              state.openSystemTerminal(project.path);
+            } else {
+              state.openIntegratedTerminal(project.path, title: project.name);
+            }
+          },
         ),
         ContextMenuItem(
           label: 'Copy Path',
@@ -324,10 +339,12 @@ class ProjectCard extends StatelessWidget {
                               const SizedBox(width: 4),
                               IconBtn(
                                 icon: AppIcons.terminal,
-                                tooltip: 'Open in Terminal',
+                                tooltip: state.settings.defaultTerminal == DefaultTerminalType.integrated
+                                    ? 'Open in Integrated Terminal'
+                                    : 'Open in System Terminal',
                                 size: 28,
                                 iconSize: 15,
-                                onClick: () => Platform.openInTerminal(project.path),
+                                onClick: () => state.openTerminal(project.path, title: project.name),
                               ),
                               const SizedBox(width: 4),
                               IconBtn(

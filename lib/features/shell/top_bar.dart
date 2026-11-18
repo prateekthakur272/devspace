@@ -158,6 +158,18 @@ class _AppTopBarState extends State<AppTopBar> {
             ),
             const SizedBox(width: 8),
           ],
+          // Toggle Integrated Terminal (like VS Code)
+          IconBtn(
+            icon: AppIcons.terminal,
+            tooltip: state.uiState.terminalVisible
+                ? 'Hide Integrated Terminal (⌘`)'
+                : 'Show Integrated Terminal (⌘`)',
+            size: 34,
+            iconSize: 15,
+            active: state.uiState.terminalVisible,
+            onClick: () => state.toggleTerminal(),
+          ),
+          const SizedBox(width: 8),
           // Toggle Notes Side Pane
           IconBtn(
             icon: AppIcons.note,

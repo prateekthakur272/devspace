@@ -268,6 +268,11 @@ List<PlatformMenuItem> buildMacMenus(AppState state, VoidCallback onQuit) {
               onSelected: () => state.toggleToolsRail(),
             ),
             PlatformMenuItem(
+              label: 'Toggle Integrated Terminal',
+              shortcut: const SingleActivator(LogicalKeyboardKey.backquote, meta: true),
+              onSelected: () => state.toggleTerminal(),
+            ),
+            PlatformMenuItem(
               label: 'Pin Application to Toolbar…',
               onSelected: () => state.modal = const ModalPinApp(),
             ),
@@ -491,6 +496,12 @@ Map<String, List<ContextMenuItem>> buildWindowsLinuxMenuItems({
         icon: AppIcons.terminal,
         shortcut: 'Ctrl+J',
         action: () => state.toggleToolsRail(),
+      ),
+      ContextMenuItem(
+        label: 'Toggle Integrated Terminal',
+        icon: AppIcons.terminal,
+        shortcut: 'Ctrl+`',
+        action: () => state.toggleTerminal(),
       ),
       ContextMenuItem(
         label: 'Pin Application to Toolbar…',

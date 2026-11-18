@@ -303,10 +303,12 @@ class _RepoRow extends StatelessWidget {
               const SizedBox(width: 4),
               IconBtn(
                 icon: AppIcons.terminal,
-                tooltip: 'Terminal at root',
+                tooltip: state.settings.defaultTerminal == DefaultTerminalType.integrated
+                    ? 'Integrated Terminal at root'
+                    : 'System Terminal at root',
                 size: 26,
                 iconSize: 13,
-                onClick: () => Platform.openInTerminal(project.path),
+                onClick: () => state.openTerminal(project.path, title: project.name),
               ),
               const SizedBox(width: 6),
               Btn(

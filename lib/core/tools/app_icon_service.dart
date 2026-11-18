@@ -97,8 +97,26 @@ class AppIconService {
     return null;
   }
 
-  /// Extracts icons in parallel for a batch of apps.
+  /// Extracts icons in parallel or batch for a group of apps.
   static Future<void> extractBatch(List<PinnedApp> apps) async {
+    if (apps.isEmpty) return;
+
+    if (io.Platform.isMacOS) {
+      final missingPairs = <String>[];
+      for (final app in apps) {
+        final sanitized = sanitizeId(app.name);
+        final outPath = p.join(cacheDir, '$sanitized.png');
+        if (!io.File(outPath).existsSync() && !_cachedIds.contains(sanitized)) {
+          missingPairs.addAll([app.path, outPath]);
+        }
+      }
+
+      if (missingPairs.isNotEmpty) {
+        final ok = await _extractBatchSwift(missingPairs);
+        if (ok) return;
+      }
+    }
+
     final futures = <Future>[];
     for (final app in apps) {
       final sanitized = sanitizeId(app.name);
@@ -109,6 +127,46 @@ class AppIconService {
     if (futures.isNotEmpty) {
       await Future.wait(futures);
     }
+  }
+
+  static Future<bool> _extractBatchSwift(List<String> pairs) async {
+    try {
+      const swiftScript = '''
+import AppKit
+
+let args = Array(CommandLine.arguments.dropFirst())
+var i = 0
+let size = NSSize(width: 64, height: 64)
+while i + 1 < args.count {
+    let appPath = args[i]
+    let outPath = args[i + 1]
+    i += 2
+    
+    if FileManager.default.fileExists(atPath: outPath) { continue }
+    let img = NSWorkspace.shared.icon(forFile: appPath)
+    guard let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 64, pixelsHigh: 64, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0) else { continue }
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+    img.draw(in: NSRect(origin: .zero, size: size), from: .zero, operation: .copy, fraction: 1.0)
+    NSGraphicsContext.restoreGraphicsState()
+    if let png = rep.representation(using: .png, properties: [:]) {
+        try? png.write(to: URL(fileURLWithPath: outPath))
+    }
+}
+''';
+      final res = await io.Process.run('/usr/bin/swift', ['-e', swiftScript, ...pairs]);
+      if (res.exitCode == 0) {
+        for (int i = 1; i < pairs.length; i += 2) {
+          final outPath = pairs[i];
+          final id = p.basenameWithoutExtension(outPath);
+          if (io.File(outPath).existsSync()) {
+            _cachedIds.add(id);
+          }
+        }
+        return true;
+      }
+    } catch (_) {}
+    return false;
   }
 
   /// Extracts the application icon for the macOS system terminal (or installed terminal emulator).
@@ -249,12 +307,21 @@ class AppIconService {
     await Future.wait(tasks);
   }
 
-  /// Extracts the macOS `.icns` from [appPath] and converts it to a 64x64 PNG via `sips`.
+  /// Extracts the macOS icon from [appPath] and converts it to a 64x64 PNG.
+  /// Uses native NSWorkspace via Swift (works for all apps including system apps),
+  /// falling back to .icns / sips if needed.
   static Future<String?> extractMacIcon(String appPath, String id) async {
     final sanitized = sanitizeId(id);
     final outPath = p.join(cacheDir, '$sanitized.png');
 
     if (io.File(outPath).existsSync()) {
+      _cachedIds.add(sanitized);
+      return outPath;
+    }
+
+    // 1. Try native Cocoa NSWorkspace extraction
+    final ok = await _extractBatchSwift([appPath, outPath]);
+    if (ok && io.File(outPath).existsSync()) {
       _cachedIds.add(sanitized);
       return outPath;
     }

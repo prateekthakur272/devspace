@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:devspace/app/app_state.dart';
 import 'package:devspace/components/drag_devices.dart';
 import 'package:devspace/components/text.dart';
@@ -12,6 +13,7 @@ import 'package:devspace/features/shell/status_bar.dart';
 import 'package:devspace/features/shell/tools_rail.dart';
 import 'package:devspace/features/shell/top_bar.dart';
 import 'package:devspace/features/shell/window_chrome.dart';
+import 'package:devspace/features/terminal/terminal_panel.dart';
 import 'package:devspace/theme/theme.dart';
 
 class AppShell extends StatelessWidget {
@@ -26,9 +28,14 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: state,
-      builder: (context, _) {
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.backquote, meta: true): () => state.toggleTerminal(),
+        const SingleActivator(LogicalKeyboardKey.backquote, control: true): () => state.toggleTerminal(),
+      },
+      child: ListenableBuilder(
+        listenable: state,
+        builder: (context, _) {
         final p = context.pal;
         final ui = state.uiState;
 
@@ -103,11 +110,31 @@ class AppShell extends StatelessWidget {
                           },
                         ),
                       ],
-                      // Main Content Area
+                      // Main Content Area with Integrated Bottom Terminal
                       Expanded(
-                        child: ui.activeTab == 'git_radar'
-                            ? GitRadarView(state: state)
-                            : CatalogView(state: state),
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: ui.activeTab == 'git_radar'
+                                  ? GitRadarView(state: state)
+                                  : CatalogView(state: state),
+                            ),
+                            if (ui.terminalVisible) ...[
+                              TerminalSplitter(
+                                color: p.border,
+                                onDrag: (delta) {
+                                  state.setTerminalHeight(
+                                    (ui.terminalHeight + delta).clamp(140.0, 600.0),
+                                  );
+                                },
+                              ),
+                              SizedBox(
+                                height: ui.terminalHeight.clamp(140.0, 600.0),
+                                child: TerminalPanel(state: state),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                       // Right Notes Side Pane
                       if (ui.notesPaneVisible) ...[
@@ -183,7 +210,8 @@ class AppShell extends StatelessWidget {
           ],
         );
       },
-    );
+    ),
+  );
   }
 }
 
