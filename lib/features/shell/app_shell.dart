@@ -9,6 +9,7 @@ import 'package:devspace/features/git_radar/git_radar_view.dart';
 import 'package:devspace/features/notes/notes_pane.dart';
 import 'package:devspace/features/shell/palette.dart';
 import 'package:devspace/features/shell/status_bar.dart';
+import 'package:devspace/features/shell/tools_rail.dart';
 import 'package:devspace/features/shell/top_bar.dart';
 import 'package:devspace/features/shell/window_chrome.dart';
 import 'package:devspace/theme/theme.dart';
@@ -123,6 +124,9 @@ class AppShell extends StatelessWidget {
                           child: NotesPane(state: state),
                         ),
                       ],
+                      // Far-Right Tools Rail (Installed IDEs & CLI Tools)
+                      if (state.settings.showToolsRail)
+                        ToolsRail(state: state),
                     ],
                   ),
                 ),

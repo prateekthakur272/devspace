@@ -262,6 +262,15 @@ List<PlatformMenuItem> buildMacMenus(AppState state, VoidCallback onQuit) {
               shortcut: const SingleActivator(LogicalKeyboardKey.keyB, meta: true, alt: true),
               onSelected: () => state.toggleNotesPane(),
             ),
+            PlatformMenuItem(
+              label: 'Toggle Tools Rail',
+              shortcut: const SingleActivator(LogicalKeyboardKey.keyJ, meta: true),
+              onSelected: () => state.toggleToolsRail(),
+            ),
+            PlatformMenuItem(
+              label: 'Pin Application to Toolbar…',
+              onSelected: () => state.modal = const ModalPinApp(),
+            ),
           ],
         ),
         PlatformMenuItemGroup(
@@ -476,6 +485,17 @@ Map<String, List<ContextMenuItem>> buildWindowsLinuxMenuItems({
         icon: AppIcons.note,
         shortcut: 'Ctrl+Shift+B',
         action: () => state.toggleNotesPane(),
+      ),
+      ContextMenuItem(
+        label: 'Toggle Tools Rail',
+        icon: AppIcons.terminal,
+        shortcut: 'Ctrl+J',
+        action: () => state.toggleToolsRail(),
+      ),
+      ContextMenuItem(
+        label: 'Pin Application to Toolbar…',
+        icon: AppIcons.add,
+        action: () => state.modal = const ModalPinApp(),
       ),
       const ContextMenuItem(label: ''),
       ContextMenuItem(

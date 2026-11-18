@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' as io;
 import 'package:flutter/material.dart';
 import 'package:devspace/app/app_state.dart';
 import 'package:devspace/components/buttons.dart';
@@ -9,6 +10,8 @@ import 'package:devspace/components/text.dart';
 import 'package:devspace/core/git/git_service.dart';
 import 'package:devspace/core/model/models.dart';
 import 'package:devspace/core/storage/storage.dart';
+import 'package:devspace/core/tools/app_icon_service.dart';
+import 'package:devspace/core/tools/desktop_app_service.dart';
 import 'package:devspace/features/dialogs/developer_dialog.dart';
 import 'package:devspace/features/dialogs/onboarding_dialog.dart';
 import 'package:devspace/features/notes/note_dialog.dart';
@@ -48,6 +51,7 @@ Widget buildActiveModal(BuildContext context, AppState state) {
         ModalGitDetails(:final project, :final status) =>
           _GitDetailsDialog(state: state, project: project, status: status),
         ModalDetectedTools() => _DetectedToolsDialog(state: state),
+        ModalPinApp() => _PinAppDialog(state: state),
         ModalCreateGroup() => _CreateGroupDialog(state: state),
         ModalEditGroup(:final group) => _EditGroupDialog(state: state, group: group),
         ModalCreateNote(:final initialProjectId, :final initialTag) =>
@@ -510,11 +514,15 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                                 color: _category == cat ? p.accent : p.muted,
                               ),
                               const SizedBox(width: 6),
-                              T(
-                                cat.label,
-                                size: 11.5,
-                                weight: _category == cat ? FontWeight.w600 : FontWeight.w500,
-                                color: _category == cat ? p.text : p.muted,
+                              Flexible(
+                                child: T(
+                                  cat.label,
+                                  size: 11.5,
+                                  weight: _category == cat ? FontWeight.w600 : FontWeight.w500,
+                                  color: _category == cat ? p.text : p.muted,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),
@@ -638,6 +646,96 @@ class _SettingsDialogState extends State<_SettingsDialog> {
             ],
           ),
         ),
+        const SizedBox(height: 12),
+
+        // Tools & IDEs Quick Launch Rail Switch Tile
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: p.field,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: p.border, width: 1),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: p.accent.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(AppIcons.terminal, size: 16, color: p.accent),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const T('Tools & IDEs Quick Launch Rail', size: 12.5, weight: FontWeight.w600),
+                    const SizedBox(height: 2),
+                    T(
+                      'Display a vertical launcher toolbar at the right edge after the notes pane to directly open installed IDEs and terminal tools.',
+                      size: 11,
+                      color: p.muted,
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: settings.showToolsRail,
+                activeColor: p.accent,
+                onChanged: (val) {
+                  _updateSettings((s) => s.copyWith(showToolsRail: val));
+                },
+              ),
+            ],
+          ),
+        ),
+        if (settings.showToolsRail) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: p.field,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: p.border, width: 1),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      T('Pinned Toolbar Applications (${widget.state.pinnedApps.length})',
+                          size: 12, weight: FontWeight.w600),
+                      const SizedBox(height: 2),
+                      T(
+                        widget.state.pinnedApps.isEmpty
+                            ? 'Pin any custom application or utility to the quick-launch rail.'
+                            : widget.state.pinnedApps.map((a) => a.name).join(', '),
+                        size: 11,
+                        color: p.muted,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Btn(
+                  label: 'Pin Apps…',
+                  icon: AppIcons.add,
+                  height: 28,
+                  fontSize: 11.5,
+                  onClick: () => widget.state.modal = const ModalPinApp(),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 14),
 
         // App Info & Version Banner
@@ -661,10 +759,12 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 6,
+                      runSpacing: 4,
                       children: [
                         const T(AppConfig.NAME, size: 13, weight: FontWeight.w700),
-                        const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                           decoration: BoxDecoration(
@@ -791,6 +891,54 @@ class _SettingsDialogState extends State<_SettingsDialog> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Tools & IDEs Quick Launch Rail Switch Tile
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: p.field,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: p.border, width: 1),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: p.accent.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(AppIcons.terminal, size: 16, color: p.accent),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const T('Tools & IDEs Quick Launch Rail', size: 12.5, weight: FontWeight.w600),
+                    const SizedBox(height: 2),
+                    T(
+                      'Vertical launcher toolbar at the right end of the workspace to directly open installed editors and CLI tools.',
+                      size: 11,
+                      color: p.muted,
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: settings.showToolsRail,
+                activeColor: p.accent,
+                onChanged: (val) {
+                  _updateSettings((s) => s.copyWith(showToolsRail: val));
+                },
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
         const T('Default Code Editor', size: 12.5, weight: FontWeight.w700),
         const SizedBox(height: 4),
         T(
@@ -985,6 +1133,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
   // --- TAB 3: GIT & RADAR ---
   Widget _buildGitTab(BuildContext context, Pal p, AppSettings settings) {
     const intervals = [
+      (0, 'None', 'Disable background polling; refresh on-demand only'),
       (15, '15 seconds', 'High frequency / active coding'),
       (30, '30 seconds', 'Recommended standard'),
       (60, '1 minute', 'Balanced performance'),
@@ -1047,7 +1196,16 @@ class _SettingsDialogState extends State<_SettingsDialog> {
                         color: isSelected ? p.accent : p.text,
                       ),
                       const Spacer(),
-                      T(item.$3, size: 10.5, color: p.muted),
+                      Flexible(
+                        child: T(
+                          item.$3,
+                          size: 10.5,
+                          color: p.muted,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          align: TextAlign.end,
+                        ),
+                      ),
                     ],
                   ),
                 );
@@ -2743,6 +2901,328 @@ class _DropdownField<V> extends StatelessWidget {
           onChanged: onChanged,
         ),
       ),
+    );
+  }
+}
+
+class _PinAppDialog extends StatefulWidget {
+  const _PinAppDialog({required this.state});
+  final AppState state;
+
+  @override
+  State<_PinAppDialog> createState() => _PinAppDialogState();
+}
+
+class _PinAppDialogState extends State<_PinAppDialog> {
+  final _searchCtrl = TextEditingController();
+  List<PinnedApp> _systemApps = [];
+  bool _loading = true;
+  String _filter = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadApps();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadApps() async {
+    final list = await DesktopAppService.listSystemApplications();
+    if (mounted) {
+      setState(() {
+        _systemApps = list;
+        _loading = false;
+      });
+    }
+    await AppIconService.extractBatch(list);
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _browseDisk() async {
+    final path = await Platform.pickApplication('Choose an application to pin');
+    if (path != null && path.isNotEmpty) {
+      await widget.state.pinApp(path);
+      if (mounted) setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.pal;
+
+    // Filtered apps by search query
+    final filtered = _systemApps.where((app) {
+      if (_filter.isEmpty) return true;
+      return app.name.toLowerCase().contains(_filter) ||
+          app.path.toLowerCase().contains(_filter);
+    }).toList();
+
+    return ModalScaffold(
+      title: 'Pin Application to Toolbar',
+      width: 580,
+      onClose: () => widget.state.modal = null,
+      actions: [
+        Btn(
+          label: 'Browse from Disk…',
+          icon: AppIcons.folder,
+          onClick: _browseDisk,
+        ),
+        Btn(
+          label: 'Done',
+          primary: true,
+          onClick: () => widget.state.modal = null,
+        ),
+      ],
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 520),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Explanatory Banner
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: p.field,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: p.border, width: 1),
+              ),
+              child: Row(
+                children: [
+                  Icon(AppIcons.add, size: 16, color: p.accent),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const T(
+                          'Quick-Launch Toolbar Applications',
+                          size: 12.5,
+                          weight: FontWeight.w600,
+                        ),
+                        const SizedBox(height: 2),
+                        T(
+                          'Pin any installed application or custom executable to the right-hand desktop toolbar for one-click access.',
+                          size: 11.5,
+                          color: p.muted,
+                          overflow: TextOverflow.visible,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Search Bar
+            _ModalTextField(
+              controller: _searchCtrl,
+              hint: 'Search installed applications…',
+              onChanged: (val) {
+                setState(() => _filter = val.trim().toLowerCase());
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // Middle Apps List
+            Flexible(
+              child: _loading
+                  ? Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 40),
+                      child: Center(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: p.accent,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            T('Scanning installed applications…', size: 12, color: p.muted),
+                          ],
+                        ),
+                      ),
+                    )
+                  : filtered.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 40),
+                          child: Center(
+                            child: T(
+                              _filter.isEmpty
+                                  ? 'No applications found in standard paths.\nClick "Browse from Disk…" to select an app.'
+                                  : 'No applications match "$_filter"',
+                              size: 12,
+                              color: p.muted,
+                              align: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      : SingleChildScrollView(
+                          physics: const ClampingScrollPhysics(),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final app in filtered) _buildAppRow(app, p),
+                            ],
+                          ),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppRow(PinnedApp app, Pal p) {
+    final isPinned = widget.state.pinnedApps.any((a) => a.path == app.path);
+    final onRail = widget.state.installedDesktopApps.any((a) => a.resolvedPath == app.path);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: p.field,
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isPinned ? p.accent.withOpacity(0.5) : p.border,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          // App icon
+          _AppIconView(
+            app: app,
+            fallbackColor: p.accent,
+          ),
+          const SizedBox(width: 10),
+          // App name & path
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                T(app.name, size: 12.5, weight: FontWeight.w600),
+                const SizedBox(height: 1),
+                T(
+                  app.path,
+                  size: 10.5,
+                  color: p.muted,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (onRail)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: p.border.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: T('Detected on Rail', size: 11, color: p.muted),
+            )
+          else if (isPinned)
+            Btn(
+              label: 'Pinned',
+              icon: Icons.check_rounded,
+              primary: true,
+              height: 28,
+              fontSize: 11.5,
+              onClick: () {
+                widget.state.unpinApp(app.path);
+                setState(() {});
+              },
+            )
+          else
+            Btn(
+              label: 'Pin',
+              icon: AppIcons.add,
+              outlined: true,
+              height: 28,
+              fontSize: 11.5,
+              onClick: () async {
+                await widget.state.pinApp(app.path);
+                setState(() {});
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AppIconView extends StatefulWidget {
+  const _AppIconView({required this.app, required this.fallbackColor});
+  final PinnedApp app;
+  final Color fallbackColor;
+
+  @override
+  State<_AppIconView> createState() => _AppIconViewState();
+}
+
+class _AppIconViewState extends State<_AppIconView> {
+  io.File? _file;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AppIconView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.app.path != widget.app.path) {
+      _resolve();
+    }
+  }
+
+  Future<void> _resolve() async {
+    final cached = AppIconService.getIconFileForApp(widget.app);
+    if (cached != null && cached.existsSync()) {
+      if (mounted) setState(() => _file = cached);
+      return;
+    }
+    await AppIconService.extractAppIcon(widget.app.path, widget.app.name);
+    if (mounted) {
+      final found = AppIconService.getIconFileForApp(widget.app);
+      if (found != null && found.existsSync()) {
+        setState(() => _file = found);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: _file != null && _file!.existsSync()
+          ? Image.file(
+              _file!,
+              width: 24,
+              height: 24,
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
+              errorBuilder: (context, error, stackTrace) =>
+                  Icon(Icons.apps_rounded, size: 20, color: widget.fallbackColor),
+            )
+          : Icon(Icons.apps_rounded, size: 20, color: widget.fallbackColor),
     );
   }
 }

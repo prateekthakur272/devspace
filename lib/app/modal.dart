@@ -47,6 +47,10 @@ class ModalDetectedTools extends AppModal {
   const ModalDetectedTools();
 }
 
+class ModalPinApp extends AppModal {
+  const ModalPinApp();
+}
+
 class ModalCreateGroup extends AppModal {
   const ModalCreateGroup();
 }

@@ -8,6 +8,8 @@ import 'package:devspace/core/logging/log.dart';
 import 'package:devspace/core/model/note_markdown.dart';
 import 'package:devspace/core/model/models.dart';
 import 'package:devspace/core/storage/storage.dart';
+import 'package:devspace/core/tools/app_icon_service.dart';
+import 'package:devspace/core/tools/desktop_app_service.dart';
 import 'package:devspace/core/tools/tool_detection_service.dart';
 
 export 'package:devspace/app/modal.dart';
@@ -30,6 +32,7 @@ class AppState with ChangeNotifier {
 
   List<EditorType> _availableEditors = [EditorType.vscode];
   List<DetectedTool> _detectedTools = [];
+  List<DesktopApp> _installedDesktopApps = [];
   bool _toolsScanning = false;
 
   AppModal? _modal;
@@ -51,6 +54,7 @@ class AppState with ChangeNotifier {
   bool isGitLoading(String projectId) => _gitLoading[projectId] ?? false;
   List<EditorType> get availableEditors => List.unmodifiable(_availableEditors);
   List<DetectedTool> get detectedTools => List.unmodifiable(_detectedTools);
+  List<DesktopApp> get installedDesktopApps => List.unmodifiable(_installedDesktopApps);
   bool get toolsScanning => _toolsScanning;
 
   AppModal? get modal => _modal;
@@ -124,10 +128,21 @@ class AppState with ChangeNotifier {
     try {
       final editors = await IdeService.detectAll();
       final tools = await ToolDetectionService.detectAllTools();
+      final apps = await DesktopAppService.detectAll();
 
       _availableEditors = editors.keys.where((e) => e != EditorType.custom).toList();
       if (_availableEditors.isEmpty) _availableEditors = [EditorType.vscode];
       _detectedTools = tools;
+      _installedDesktopApps = apps;
+
+      // Extract and cache real application icons from installed OS apps
+      await AppIconService.extractAllInstalled(
+        editors: _availableEditors,
+        desktopApps: _installedDesktopApps,
+      );
+      for (final a in _settings.pinnedApps) {
+        await _extractPinnedIcon(a);
+      }
     } catch (e, st) {
       Log.warning(_tag, 'Failed auto-detecting tools', e, st);
     } finally {
@@ -138,6 +153,11 @@ class AppState with ChangeNotifier {
 
   void _scheduleGitPolling() {
     _gitPollTimer?.cancel();
+    _gitPollTimer = null;
+    if (_settings.gitRefreshIntervalSeconds <= 0) {
+      Log.info(_tag, 'Git background polling disabled (none)');
+      return;
+    }
     final interval = Duration(
       seconds: _settings.gitRefreshIntervalSeconds.clamp(10, 300),
     );
@@ -149,6 +169,46 @@ class AppState with ChangeNotifier {
     AppStore.saveSettings(_settings);
     _scheduleGitPolling();
     notifyListeners();
+  }
+
+  List<PinnedApp> get pinnedApps => _settings.pinnedApps;
+
+  /// Pins an application (a `.app` bundle on macOS, an executable elsewhere)
+  /// to the tools rail and caches its icon.
+  Future<void> pinApp(String path) async {
+    final trimmed = path.endsWith('/') ? path.substring(0, path.length - 1) : path;
+    var name = trimmed.split(RegExp(r'[\\/]')).last;
+    name = name.replaceFirst(RegExp(r'\.(app|exe|lnk)$', caseSensitive: false), '');
+    if (name.isEmpty) return;
+
+    final already = _settings.pinnedApps.any((a) => a.path == trimmed) ||
+        _installedDesktopApps.any((a) => a.resolvedPath == trimmed);
+    if (already) {
+      toast = '$name is already on the rail';
+      return;
+    }
+    final app = PinnedApp(name: name, path: trimmed);
+    updateSettings(_settings.copyWith(pinnedApps: [..._settings.pinnedApps, app]));
+    await _extractPinnedIcon(app);
+    notifyListeners();
+  }
+
+  void unpinApp(String path) {
+    updateSettings(_settings.copyWith(
+      pinnedApps: _settings.pinnedApps.where((a) => a.path != path).toList(),
+    ));
+  }
+
+  Future<void> _extractPinnedIcon(PinnedApp app) async {
+    try {
+      await AppIconService.extractAppIcon(app.path, app.name);
+    } catch (e, st) {
+      Log.warning(_tag, 'Could not extract icon for ${app.name}', e, st);
+    }
+  }
+
+  void toggleToolsRail() {
+    updateSettings(_settings.copyWith(showToolsRail: !_settings.showToolsRail));
   }
 
   void updateUiState(SavedState Function(SavedState current) update) {

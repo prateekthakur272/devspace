@@ -217,6 +217,84 @@ class IdeService {
     return list;
   }
 
+  /// Launches an editor directly, optionally opening [path] (file or folder).
+  static Future<bool> launchEditor(
+    EditorType editor, {
+    String? path,
+  }) async {
+    Log.info(_tag, 'Launching editor "${editor.label}"${path != null ? ' at $path' : ''}');
+
+    try {
+      if (!_detectionRun) await detectAll();
+      final detected = _detectedCache[editor];
+
+      if (Platform.isMacOS) {
+        if (detected != null && !detected.isCli) {
+          final args = ['-a', detected.launchTarget];
+          if (path != null && path.isNotEmpty) args.add(path);
+          final res = await Process.run('open', args);
+          if (res.exitCode == 0) return true;
+        }
+
+        // Try CLI command
+        if (editor.cliCmd.isNotEmpty) {
+          final env = _buildEnvironment();
+          try {
+            final args = path != null && path.isNotEmpty ? [path] : <String>[];
+            final res = await Process.run(editor.cliCmd, args, environment: env);
+            if (res.exitCode == 0) return true;
+          } catch (_) {}
+        }
+
+        // Try any macApp variant
+        for (final app in editor.macAppVariants) {
+          final args = ['-a', app];
+          if (path != null && path.isNotEmpty) args.add(path);
+          final res = await Process.run('open', args);
+          if (res.exitCode == 0) return true;
+        }
+
+        if (path != null && path.isNotEmpty) {
+          await Process.run('open', [path]);
+          return true;
+        }
+        return false;
+      } else if (Platform.isWindows) {
+        if (detected != null && detected.launchTarget.isNotEmpty) {
+          final args = path != null && path.isNotEmpty ? [path] : <String>[];
+          await Process.start(detected.launchTarget, args, runInShell: true);
+          return true;
+        }
+        if (editor.cliCmd.isNotEmpty) {
+          final args = ['/c', editor.cliCmd];
+          if (path != null && path.isNotEmpty) args.add(path);
+          await Process.start('cmd.exe', args, runInShell: true);
+          return true;
+        }
+        if (path != null && path.isNotEmpty) {
+          await Process.start('explorer.exe', [path], runInShell: true);
+          return true;
+        }
+        return false;
+      } else {
+        // Linux
+        if (editor.cliCmd.isNotEmpty) {
+          final args = path != null && path.isNotEmpty ? [path] : <String>[];
+          await Process.start(editor.cliCmd, args, runInShell: true);
+          return true;
+        }
+        if (path != null && path.isNotEmpty) {
+          await Process.start('xdg-open', [path], runInShell: true);
+          return true;
+        }
+        return false;
+      }
+    } catch (e, st) {
+      Log.error(_tag, 'Failed to launch editor ${editor.label}', e, st);
+      return false;
+    }
+  }
+
   static Future<bool> openProject(
     Project project, {
     EditorType? overrideEditor,
@@ -241,53 +319,7 @@ class IdeService {
         return true;
       }
 
-      if (!_detectionRun) await detectAll();
-      final detected = _detectedCache[editor];
-
-      if (Platform.isMacOS) {
-        if (detected != null && !detected.isCli) {
-          final res = await Process.run('open', ['-a', detected.launchTarget, path]);
-          if (res.exitCode == 0) return true;
-        }
-
-        // Try CLI command
-        if (editor.cliCmd.isNotEmpty) {
-          final env = _buildEnvironment();
-          try {
-            final res = await Process.run(editor.cliCmd, [path], environment: env);
-            if (res.exitCode == 0) return true;
-          } catch (_) {}
-        }
-
-        // Try any macApp variant
-        for (final app in editor.macAppVariants) {
-          final res = await Process.run('open', ['-a', app, path]);
-          if (res.exitCode == 0) return true;
-        }
-
-        // Fallback: open directory in Finder
-        await Process.run('open', [path]);
-        return true;
-      } else if (Platform.isWindows) {
-        if (detected != null && detected.launchTarget.isNotEmpty) {
-          await Process.start(detected.launchTarget, [path], runInShell: true);
-          return true;
-        }
-        if (editor.cliCmd.isNotEmpty) {
-          await Process.start('cmd.exe', ['/c', editor.cliCmd, path], runInShell: true);
-          return true;
-        }
-        await Process.start('explorer.exe', [path], runInShell: true);
-        return true;
-      } else {
-        // Linux
-        if (editor.cliCmd.isNotEmpty) {
-          await Process.start(editor.cliCmd, [path], runInShell: true);
-          return true;
-        }
-        await Process.start('xdg-open', [path], runInShell: true);
-        return true;
-      }
+      return await launchEditor(editor, path: path);
     } catch (e, st) {
       Log.error(_tag, 'Failed to launch editor for project $path', e, st);
       return false;

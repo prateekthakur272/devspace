@@ -171,6 +171,30 @@ class _CommandPaletteState extends State<CommandPalette> {
     ));
 
     list.add(_PaletteItem(
+      title: 'Toggle Tools & IDEs Rail',
+      subtitle: state.settings.showToolsRail
+          ? 'Hide the right launcher rail for installed tools and editors'
+          : 'Show the right launcher rail for installed tools and editors',
+      category: 'Actions',
+      icon: AppIcons.terminal,
+      action: () {
+        state.paletteOpen = false;
+        state.toggleToolsRail();
+      },
+    ));
+
+    list.add(_PaletteItem(
+      title: 'Pin Application to Toolbar…',
+      subtitle: 'Add a desktop application to the quick-launch rail',
+      category: 'Actions',
+      icon: AppIcons.add,
+      action: () {
+        state.paletteOpen = false;
+        state.modal = const ModalPinApp();
+      },
+    ));
+
+    list.add(_PaletteItem(
       title: 'Create New Note…',
       subtitle: 'Add a new note, checklist, or project task',
       category: 'Actions',

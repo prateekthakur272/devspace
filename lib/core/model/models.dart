@@ -333,6 +333,27 @@ class WorkspaceGroup {
       );
 }
 
+/// A desktop application the user pinned to the tools rail.
+class PinnedApp {
+  final String name;
+  final String path;
+
+  const PinnedApp({required this.name, required this.path});
+
+  /// Stable id used for the cached icon file.
+  String get iconId => name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9_]'), '_');
+
+  Map<String, dynamic> toJson() => {'name': name, 'path': path};
+
+  static PinnedApp? fromJson(Object? j) {
+    if (j is! Map) return null;
+    final path = j['path'];
+    if (path is! String || path.isEmpty) return null;
+    final name = j['name'];
+    return PinnedApp(name: name is String && name.isNotEmpty ? name : path, path: path);
+  }
+}
+
 /// App settings.
 class AppSettings {
   final ThemeMode themeMode;
@@ -340,6 +361,8 @@ class AppSettings {
   final String terminalEmulator;
   final int gitRefreshIntervalSeconds;
   final bool autoDetectProjects;
+  final bool showToolsRail;
+  final List<PinnedApp> pinnedApps;
 
   const AppSettings({
     this.themeMode = ThemeMode.system,
@@ -347,6 +370,8 @@ class AppSettings {
     this.terminalEmulator = 'default',
     this.gitRefreshIntervalSeconds = 30,
     this.autoDetectProjects = true,
+    this.showToolsRail = true,
+    this.pinnedApps = const [],
   });
 
   AppSettings copyWith({
@@ -355,6 +380,8 @@ class AppSettings {
     String? terminalEmulator,
     int? gitRefreshIntervalSeconds,
     bool? autoDetectProjects,
+    bool? showToolsRail,
+    List<PinnedApp>? pinnedApps,
   }) =>
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
@@ -363,6 +390,8 @@ class AppSettings {
         gitRefreshIntervalSeconds:
             gitRefreshIntervalSeconds ?? this.gitRefreshIntervalSeconds,
         autoDetectProjects: autoDetectProjects ?? this.autoDetectProjects,
+        showToolsRail: showToolsRail ?? this.showToolsRail,
+        pinnedApps: pinnedApps ?? this.pinnedApps,
       );
 
   Map<String, dynamic> toJson() => {
@@ -371,6 +400,8 @@ class AppSettings {
         'terminalEmulator': terminalEmulator,
         'gitRefreshIntervalSeconds': gitRefreshIntervalSeconds,
         'autoDetectProjects': autoDetectProjects,
+        'showToolsRail': showToolsRail,
+        'pinnedApps': pinnedApps.map((a) => a.toJson()).toList(),
       };
 
   factory AppSettings.fromJson(Map<String, dynamic>? m) {
@@ -385,6 +416,12 @@ class AppSettings {
       gitRefreshIntervalSeconds:
           (m['gitRefreshIntervalSeconds'] as num?)?.toInt() ?? 30,
       autoDetectProjects: m['autoDetectProjects'] as bool? ?? true,
+      showToolsRail: m['showToolsRail'] as bool? ?? true,
+      pinnedApps: (m['pinnedApps'] as List?)
+              ?.map(PinnedApp.fromJson)
+              .whereType<PinnedApp>()
+              .toList() ??
+          const [],
     );
   }
 }

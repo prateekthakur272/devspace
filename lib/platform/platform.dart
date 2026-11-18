@@ -34,6 +34,46 @@ class Platform {
     return null;
   }
 
+  /// Opens a native dialog to pick an application executable or bundle.
+  static Future<String?> pickApplication(String title) async {
+    if (isMac) {
+      try {
+        final res = await io.Process.run('osascript', [
+          '-e',
+          'try\n'
+              'POSIX path of (choose application with prompt "$title")\n'
+              'on error\n'
+              'return ""\n'
+              'end try',
+        ]);
+        if (res.exitCode == 0) {
+          final path = res.stdout.toString().trim();
+          if (path.isNotEmpty) {
+            return path.endsWith('/') ? path.substring(0, path.length - 1) : path;
+          }
+        }
+      } catch (e, st) {
+        Log.warning('platform', 'AppleScript choose application failed, trying FilePicker fallback: $e', e, st);
+      }
+    }
+
+    try {
+      await FilePicker.skipEntitlementsChecks();
+      final res = await FilePicker.pickFiles(
+        dialogTitle: title,
+        initialDirectory: isMac ? '/Applications' : null,
+        type: isLinux ? FileType.any : FileType.custom,
+        allowedExtensions: isMac ? ['app'] : (isWindows ? ['exe', 'lnk'] : null),
+      );
+      if (res.isNotEmpty && res.first.path != null && res.first.path!.isNotEmpty) {
+        return res.first.path;
+      }
+    } catch (e, st) {
+      Log.warning('platform', 'FilePicker application dialog failed: $e', e, st);
+    }
+    return null;
+  }
+
   static Future<String?> _macPickDirectoryFallback(String title) async {
     try {
       final res = await io.Process.run('osascript', [

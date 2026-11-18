@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:devspace/core/model/models.dart';
+import 'package:devspace/core/tools/app_icon_service.dart';
 
 class IdeIcon extends StatelessWidget {
   const IdeIcon({
@@ -24,6 +25,25 @@ class IdeIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 1. Prioritize actual installed OS app icon from the system
+    final installedIcon = AppIconService.getIconFile(editor.name) ??
+        AppIconService.getIconFile(editor.cliCmd);
+
+    if (installedIcon != null) {
+      return Image.file(
+        installedIcon,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+        errorBuilder: (context, error, stackTrace) => _fallback(context),
+      );
+    }
+
+    return _fallback(context);
+  }
+
+  Widget _fallback(BuildContext context) {
     final asset = _assetPath(editor);
     if (asset != null) {
       return Image.asset(

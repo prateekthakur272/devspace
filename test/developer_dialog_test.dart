@@ -243,4 +243,77 @@ void main() {
     state.dispose();
     await tester.pump(const Duration(seconds: 5));
   });
+
+  testWidgets('StatusBar right-hand buttons are pinned to the end of the bar', (tester) async {
+    tester.view.physicalSize = const Size(1200, 600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+
+    final state = AppState();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PalScope(
+            pal: DarkPal,
+            child: SizedBox(
+              width: 1200,
+              child: StatusBar(state: state),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final statusBarRect = tester.getRect(find.byType(StatusBar));
+    final cmdRect = tester.getRect(find.text('commands'));
+
+    // Command palette trigger should be pinned within 30px of the far right end
+    expect(statusBarRect.right - cmdRect.right, lessThanOrEqualTo(30.0));
+
+    state.dispose();
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('Settings dialog displays "None" option for git radar polling and disables polling', (tester) async {
+    final state = AppState();
+    state.modal = const ModalSettings();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PalScope(
+            pal: DarkPal,
+            child: Builder(
+              builder: (ctx) => Stack(
+                children: [
+                  const SizedBox.expand(),
+                  buildActiveModal(ctx, state),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Switch to Git & Radar tab
+    await tester.tap(find.text('Git & Radar'));
+    await tester.pumpAndSettle();
+
+    // Find the "None" interval option
+    final noneOption = find.text('None');
+    expect(noneOption, findsOneWidget);
+
+    // Tap "None" option
+    await tester.tap(noneOption);
+    await tester.pumpAndSettle();
+
+    expect(state.settings.gitRefreshIntervalSeconds, equals(0));
+
+    state.dispose();
+    await tester.pump(const Duration(seconds: 5));
+  });
 }
