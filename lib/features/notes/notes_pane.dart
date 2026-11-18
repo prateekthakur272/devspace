@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:devspace/app/app_state.dart';
 import 'package:devspace/components/buttons.dart';
-import 'package:devspace/components/context_menu.dart';
 import 'package:devspace/components/modifiers.dart';
 import 'package:devspace/components/text.dart';
+import 'package:devspace/core/model/note_markdown.dart';
 import 'package:devspace/core/model/models.dart';
+import 'package:devspace/features/notes/note_card.dart';
 import 'package:devspace/features/notes/note_pane_editor.dart';
 import 'package:devspace/features/notes/note_theme.dart';
 import 'package:devspace/platform/platform.dart';
@@ -125,14 +126,14 @@ class _NotesPaneState extends State<NotesPane> {
       buffer.writeln(note.content);
       buffer.writeln();
     }
-    if (note.checklist.isNotEmpty) {
+    if (note.checklist.isNotEmpty && !NoteMarkdown.hasTodoLines(note.content)) {
       buffer.writeln('### Checklist');
       for (final item in note.checklist) {
         buffer.writeln('- [${item.checked ? 'x' : ' '}] ${item.text}');
       }
       buffer.writeln();
     }
-    if (note.links.isNotEmpty) {
+    if (note.links.any((l) => !note.content.contains(l))) {
       buffer.writeln('### Links');
       for (final link in note.links) {
         buffer.writeln('- $link');
@@ -394,7 +395,7 @@ class _NotesPaneState extends State<NotesPane> {
                             for (final note in pinnedNotes)
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 8),
-                                child: _KeepNoteCard(
+                                child: NoteCard(
                                   note: note,
                                   state: widget.state,
                                   formatTime: _formatTime,
@@ -417,7 +418,7 @@ class _NotesPaneState extends State<NotesPane> {
                           for (final note in otherNotes)
                             Padding(
                               padding: const EdgeInsets.only(bottom: 8),
-                              child: _KeepNoteCard(
+                              child: NoteCard(
                                 note: note,
                                 state: widget.state,
                                 formatTime: _formatTime,
@@ -859,370 +860,6 @@ class _PaneChip extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-// Google Keep & Samsung Notes Card
-class _KeepNoteCard extends StatelessWidget {
-  const _KeepNoteCard({
-    required this.note,
-    required this.state,
-    required this.formatTime,
-    required this.onCopy,
-  });
-
-  final Note note;
-  final AppState state;
-  final String Function(DateTime) formatTime;
-  final VoidCallback onCopy;
-
-  void _openLink(String raw) {
-    final link = raw.trim();
-    if (link.startsWith('http://') || link.startsWith('https://')) {
-      Platform.openUrl(link);
-    } else if (link.startsWith('/') || link.contains(':\\')) {
-      Platform.reveal(link);
-    } else {
-      Platform.openUrl('https://$link');
-    }
-  }
-
-  void _showMenu(BuildContext context, Offset pos) {
-    ContextMenu.show(context, pos, [
-      ContextMenuItem(
-        label: 'Edit Note…',
-        icon: AppIcons.edit,
-        action: () => state.openNoteInPane(note),
-      ),
-      ContextMenuItem(
-        label: note.pinned ? 'Unpin Note' : 'Pin to Top',
-        icon: note.pinned ? AppIcons.unpin : AppIcons.pin,
-        action: () => state.togglePinNote(note.id),
-      ),
-      ContextMenuItem(
-        label: 'Copy as Markdown',
-        icon: AppIcons.copy,
-        action: onCopy,
-      ),
-      const ContextMenuItem(label: ''),
-      ContextMenuItem(
-        label: 'Delete Note',
-        icon: AppIcons.delete,
-        danger: true,
-        action: () => state.deleteNote(note.id),
-      ),
-    ]);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final p = context.pal;
-    final theme = getThemeForColor(note.color);
-    final cardBg = theme != null ? theme.surface(p.dark) : p.panel;
-    final cardBorder = theme != null
-        ? theme.accent.withOpacity(0.35)
-        : p.border;
-    final totalChecklist = note.checklist.length;
-    final checkedCount = note.checklist.where((c) => c.checked).length;
-
-    return HoverBuilder(
-      cursor: SystemMouseCursors.click,
-      onTap: () => state.openNoteInPane(note),
-      builder: (context, hovered) {
-        return GestureDetector(
-          onSecondaryTapUp: (details) => _showMenu(context, details.globalPosition),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            decoration: BoxDecoration(
-              color: cardBg,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: hovered ? p.accent.withOpacity(0.7) : cardBorder,
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(
-                    hovered ? (p.dark ? 0.35 : 0.09) : (p.dark ? 0.2 : 0.04),
-                  ),
-                  blurRadius: hovered ? 8 : 3,
-                  offset: Offset(0, hovered ? 3 : 1),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Card Header: Project Badges & Pin
-                  Padding(
-                    padding: const EdgeInsets.only(left: 10, right: 8, top: 8),
-                    child: Row(
-                      children: [
-                        // Tagged projects
-                        if (note.projectIds.isNotEmpty) ...[
-                          for (final pid in note.projectIds.take(2)) ...[
-                            Builder(
-                              builder: (_) {
-                                final pr = state.projects
-                                    .cast<Project?>()
-                                    .firstWhere((p) => p?.id == pid,
-                                        orElse: () => null);
-                                if (pr == null) return const SizedBox.shrink();
-                                return Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 5, vertical: 1.5),
-                                  margin: const EdgeInsets.only(right: 4),
-                                  decoration: BoxDecoration(
-                                    color: pr.techStack.color.withOpacity(0.18),
-                                    borderRadius: BorderRadius.circular(3),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        width: 5,
-                                        height: 5,
-                                        decoration: BoxDecoration(
-                                          color: pr.techStack.color,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      T(
-                                        pr.name,
-                                        size: 9.5,
-                                        weight: FontWeight.w600,
-                                        color: pr.techStack.color,
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ],
-                        const Spacer(),
-                        // Pin Icon Button
-                        IconBtn(
-                          icon: note.pinned ? AppIcons.pin : AppIcons.unpin,
-                          size: 20,
-                          iconSize: 12,
-                          color: note.pinned ? p.accent : p.muted,
-                          tooltip: note.pinned ? 'Unpin' : 'Pin to top',
-                          onClick: () => state.togglePinNote(note.id),
-                        ),
-                        // Quick Context Menu
-                        IconBtn(
-                          icon: AppIcons.dots,
-                          size: 20,
-                          iconSize: 11,
-                          onClick: () {
-                            final box = context.findRenderObject() as RenderBox?;
-                            if (box != null) {
-                              final pos = box.localToGlobal(
-                                  Offset(box.size.width - 100, 20));
-                              _showMenu(context, pos);
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Title & Content Body
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (note.title.isNotEmpty)
-                          T(
-                            note.title,
-                            size: 13,
-                            weight: FontWeight.w700,
-                            maxLines: 2,
-                          ),
-                        if (note.content.isNotEmpty) ...[
-                          const SizedBox(height: 3),
-                          T(
-                            note.content,
-                            size: 11.5,
-                            color: p.text.withOpacity(0.85),
-                            maxLines: 4,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  // Interactive Checklist Items (Google Keep Style)
-                  if (totalChecklist > 0) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Row(
-                            children: [
-                              T(
-                                '$checkedCount/$totalChecklist completed',
-                                size: 9.5,
-                                weight: FontWeight.w600,
-                                color: p.muted,
-                              ),
-                              const Spacer(),
-                              SizedBox(
-                                width: 45,
-                                height: 3,
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(1.5),
-                                  child: LinearProgressIndicator(
-                                    value: checkedCount / totalChecklist,
-                                    backgroundColor: p.border,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      checkedCount == totalChecklist
-                                          ? p.ok
-                                          : p.accent,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-                          for (final item in note.checklist.take(4)) ...[
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 1.5),
-                              child: Row(
-                                children: [
-                                  ClickableNoRipple(
-                                    onClick: () => state.toggleChecklistItem(
-                                        note.id, item.id),
-                                    child: Icon(
-                                      item.checked
-                                          ? Icons.check_box_rounded
-                                          : Icons.check_box_outline_blank_rounded,
-                                      size: 13,
-                                      color: item.checked ? p.accent : p.muted,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  Expanded(
-                                    child: Text(
-                                      item.text,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: item.checked ? p.muted : p.text,
-                                        decoration: item.checked
-                                            ? TextDecoration.lineThrough
-                                            : null,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                          if (totalChecklist > 4)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: T(
-                                '+${totalChecklist - 4} more tasks…',
-                                size: 9.5,
-                                color: p.muted,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  // Reference Links Chips
-                  if (note.links.isNotEmpty) ...[
-                    Padding(
-                      padding: const EdgeInsets.only(left: 10, right: 10, top: 4),
-                      child: Wrap(
-                        spacing: 4,
-                        runSpacing: 4,
-                        children: [
-                          for (final link in note.links.take(2))
-                            ClickableNoRipple(
-                              onClick: () => _openLink(link),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 5, vertical: 1.5),
-                                decoration: BoxDecoration(
-                                  color: p.field.withOpacity(0.8),
-                                  borderRadius: BorderRadius.circular(3),
-                                  border: Border.all(
-                                      color: p.border.withOpacity(0.5), width: 1),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(AppIcons.link, size: 9, color: p.accent),
-                                    const SizedBox(width: 3),
-                                    ConstrainedBox(
-                                      constraints: const BoxConstraints(maxWidth: 100),
-                                      child: T(
-                                        link,
-                                        size: 9.5,
-                                        color: p.accent,
-                                        maxLines: 1,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-
-                  // Footer: Relative timestamp & Copy action
-                  Padding(
-                    padding: const EdgeInsets.only(
-                        left: 10, right: 8, bottom: 6, top: 4),
-                    child: Row(
-                      children: [
-                        if (note.tags.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: T(
-                              note.tags.first,
-                              size: 9.5,
-                              color: p.muted,
-                            ),
-                          ),
-                        const Spacer(),
-                        T(
-                          formatTime(note.updatedAt),
-                          size: 9.5,
-                          color: p.muted,
-                        ),
-                        const SizedBox(width: 4),
-                        IconBtn(
-                          icon: AppIcons.copy,
-                          tooltip: 'Copy as Markdown',
-                          size: 18,
-                          iconSize: 10,
-                          onClick: onCopy,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:devspace/core/model/note_markdown.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
@@ -486,6 +487,9 @@ class Note {
     required this.createdAt,
     required this.updatedAt,
   });
+
+  /// Human-readable body (no markdown markers, no checklist lines) for cards.
+  String get plainContent => NoteMarkdown.plain(content);
 
   Note copyWith({
     String? id,

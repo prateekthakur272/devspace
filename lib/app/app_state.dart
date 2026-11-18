@@ -5,6 +5,7 @@ import 'package:devspace/app/modal.dart';
 import 'package:devspace/core/git/git_service.dart';
 import 'package:devspace/core/ide/ide_service.dart';
 import 'package:devspace/core/logging/log.dart';
+import 'package:devspace/core/model/note_markdown.dart';
 import 'package:devspace/core/model/models.dart';
 import 'package:devspace/core/storage/storage.dart';
 import 'package:devspace/core/tools/tool_detection_service.dart';
@@ -467,6 +468,13 @@ class AppState with ChangeNotifier {
     final idx = _notes.indexWhere((n) => n.id == noteId);
     if (idx != -1) {
       final note = _notes[idx];
+      // Keep the markdown body (source of truth for the editor) in sync.
+      var content = note.content;
+      final ci = note.checklist.indexWhere((c) => c.id == itemId);
+      if (ci >= 0 &&
+          NoteMarkdown.todoLineCount(content) == note.checklist.length) {
+        content = NoteMarkdown.toggleTodoLine(content, ci) ?? content;
+      }
       final newChecklist = note.checklist.map((item) {
         if (item.id == itemId) {
           return item.copyWith(checked: !item.checked);
@@ -474,6 +482,7 @@ class AppState with ChangeNotifier {
         return item;
       }).toList();
       _notes[idx] = note.copyWith(
+        content: content,
         checklist: newChecklist,
         updatedAt: DateTime.now(),
       );

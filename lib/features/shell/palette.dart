@@ -247,7 +247,7 @@ class _CommandPaletteState extends State<CommandPalette> {
 
       list.add(_PaletteItem(
         title: 'Note: ${note.title.isNotEmpty ? note.title : 'Untitled Note'}',
-        subtitle: [note.content, extra].where((s) => s.isNotEmpty).join(' • '),
+        subtitle: [note.plainContent, extra].where((s) => s.isNotEmpty).join(' • '),
         category: 'Notes',
         icon: AppIcons.note,
         badge: note.pinned ? 'Pinned' : null,
