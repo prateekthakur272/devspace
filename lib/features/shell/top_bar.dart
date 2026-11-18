@@ -158,16 +158,7 @@ class _AppTopBarState extends State<AppTopBar> {
             ),
             const SizedBox(width: 8),
           ],
-          // 3. Refresh Git Status button
-          IconBtn(
-            icon: AppIcons.refresh,
-            tooltip: 'Refresh all Git repositories',
-            size: 34,
-            iconSize: 15,
-            onClick: () => state.refreshAllGit(),
-          ),
-          const SizedBox(width: 8),
-          // 4. Toggle Notes Side Pane
+          // Toggle Notes Side Pane
           IconBtn(
             icon: AppIcons.note,
             tooltip: state.uiState.notesPaneVisible
