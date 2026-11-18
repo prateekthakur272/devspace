@@ -53,17 +53,24 @@ Instead of juggling nested directories in file managers, managing multiple IDE w
   - "Open with..." context menu and quick menu allows selecting any alternative installed editor on the fly.
   - Configurable launch flags and environment variables per project.
 
-### 3.3. Combined Git Health & Status Monitor
-- **Aggregated Git Dashboard**:
-  - **Status Indicators**: Clean, Modified, Untracked, Staged, Merge Conflict.
-  - **Ahead / Behind Sync Status**: Displays counts of unpushed commits (↑) and unpulled remote commits (↓).
-  - **Active Branch**: Displays the current checkout branch, warning on detached HEAD states.
-  - **Stash Count**: Indicates if stashes exist in the repository.
-- **Bulk & Individual Actions**:
-  - Open terminal at repo root.
-  - Open preferred Git GUI client (e.g., GitKraken, Fork, Tower, GitHub Desktop, SourceTree).
-  - Quick commit & push modal for rapid updates.
-  - Filter projects by "Has Uncommitted Changes" or "Needs Push".
+### 3.3. Combined Git Health & Status Monitor (Git Radar)
+- **Repository-First Architecture (`RadarRepository`)**:
+  - Automatically identifies git repository root paths and groups multiple DevSpace projects linked within the same repository (e.g. monorepos, microservices, multi-target packages).
+  - Clean card representation: status emblems, branch switchers, uncommitted change chip breakdown (`~M +S ?U 📦`), and linked project tags with tech stack badges.
+- **Detailed Inspection Sidepane**:
+  - Selecting any repository opens an interactive, resizable right-hand detail pane with desktop drag splitters (`supportedDevices: kDragDevices`).
+  - Five dedicated tabs:
+    1. **Changes**: Live list of modified/staged/untracked files with inline unified diff viewer, per-file stage/unstage, discard changes, and quick commit box.
+    2. **Commits**: Recent commit log with hash copying and author date.
+    3. **Branches**: Local branch listing with one-click branch checkout and branch creation.
+    4. **Projects**: Detailed view of all linked projects inside the repository with individual "Open" and "Terminal" triggers.
+    5. **Git Tools**: Fast repository actions including *Fetch & Prune*, *Clean Untracked Files*, *Terminal at Repo Root*, and *Reveal in File Manager*.
+- **Smart "Open" Context Submenus**:
+  - Repositories containing multiple projects provide a nested "Open" submenu allowing developers to launch either individual projects in their designated IDEs or the entire repository root in their configured default editor.
+- **Context-Aware Git Radar Left Sidebar**:
+  - Dynamically activates when viewing Git Radar, replacing the project catalog tree with repository overview metrics (All, Uncommitted, Needs Push, Needs Pull, Stashes, Clean), remotes filter, active branches, and live repository status badges with full-width *Fetch All* footer.
+- **Single-Row Responsive Toolbar**:
+  - Search input, sort dropdown (*Needs Attention First*), active dismissible filter chips, batch action buttons (*Fetch All*, *Pull Clean*, *Push All*), and more actions menu consolidated into a single compact desktop row without redundant header titles.
 
 ### 3.4. Quick Actions, Scripts & Environment Management
 - **Run Configurations & Scripts**:
@@ -188,19 +195,22 @@ Launchers resolve executable commands depending on host platform:
 
 ### Phase 1: MVP (Foundation & Core Workflows)
 - [x] Project initialization & platform configuration (`dev.prateekthakur.devspace`).
-- [ ] Local project catalog management (Add project, remove project, store in local config).
-- [ ] Auto-detection of project type (Flutter, Node, Python, Rust, Go, etc.).
-- [ ] Installed editor detection and "Open in IDE" support (VS Code, Cursor, Android Studio, Xcode, Fleet, Zed).
-- [ ] Basic Git status reader (Active branch, dirty/clean status indicator).
+- [x] Local project catalog management (Add project, remove project, store in local config).
+- [x] Auto-detection of project type (Flutter, Node, Python, Rust, Go, etc.).
+- [x] Installed editor detection and "Open in IDE" support (VS Code, Cursor, Android Studio, Xcode, Fleet, Zed).
+- [x] Basic Git status reader (Active branch, dirty/clean status indicator).
 
 ### Phase 2: Enhanced Productivity & Git Radar
-- [ ] Combined Git status dashboard with detailed file-change counts and ahead/behind commits.
-- [ ] Project grouping, workspaces, tags, and pinning.
-- [ ] Universal Command Palette (`Cmd + K` / `Ctrl + K`).
-- [ ] Configurable per-project custom scripts / task runner.
+- [x] Combined Git status dashboard with detailed file-change counts and ahead/behind commits.
+- [x] Repository-First Git Radar grouping monorepo subprojects under canonical git roots.
+- [x] Interactive Git sidepane with inline file diffs, file staging/unstaging, discard, branch management, and commit workflows.
+- [x] Project grouping, workspaces, tags, and pinning.
+- [x] Universal Command Palette (`Cmd + K` / `Ctrl + K`).
+- [x] Configurable per-project custom scripts / task runner.
+- [x] Single-row responsive toolbar with integrated search, multi-field sorting, and batch actions (Fetch All, Pull Clean, Push All).
 
 ### Phase 3: Advanced Workspaces & Automation
-- [ ] Background Git polling and real-time filesystem watchers.
+- [x] Background Git polling and real-time filesystem watchers with configurable sync intervals.
+- [x] External Git GUI integration and terminal emulator picker.
 - [ ] Docker Compose status and local dev port listeners.
-- [ ] External Git GUI integration and terminal emulator picker.
 - [ ] Project usage statistics (time active, last opened recency).

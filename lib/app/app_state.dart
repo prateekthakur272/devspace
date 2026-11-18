@@ -75,6 +75,19 @@ class AppState with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Sets the detected tools/editors directly (screenshots and tests, where
+  /// the real OS scan can't run).
+  @visibleForTesting
+  void setToolsForTesting({
+    List<EditorType>? editors,
+    List<DetectedTool>? tools,
+  }) {
+    if (editors != null) _availableEditors = editors;
+    if (tools != null) _detectedTools = tools;
+    _toolsScanning = false;
+    notifyListeners();
+  }
+
   bool get paletteOpen => _paletteOpen;
   set paletteOpen(bool open) {
     _paletteOpen = open;

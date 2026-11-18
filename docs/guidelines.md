@@ -158,6 +158,21 @@ Provide native OS bridges for:
 - **Native File & Folder Pickers**: Use `file_picker` with `FilePicker.skipEntitlementsChecks()` called on startup.
 - **External URL Launching**: Launch links via `url_launcher` with `LaunchMode.externalApplication`.
 
+### 3.7. Modal Dialog Sizing & Shrink-Wrap Pattern (`ModalScaffold`)
+- **Never wrap arbitrary `Column` dialog children in `Flexible`**: Flutter's `Column` defaults to `MainAxisSize.max`. Inside a `Flexible` with finite `maxHeight`, a `Column` expands to fill the entire available vertical space, causing even a two-line confirmation dialog to take the full window height.
+- **Screen-Aware Body Constraints**: In `ModalScaffold`, compute available body height using `LayoutBuilder` against screen height minus total chrome (margins: 48px, header: ~48px, inner padding: 32px, action footer: ~56px). Constrain the body using `ConstrainedBox(constraints: BoxConstraints(maxHeight: maxBodyHeight))`.
+- **Enforce `MainAxisSize.min`**: Always set `mainAxisSize: MainAxisSize.min` on modal dialog root columns so dialogs hug their content naturally. For large or diagnostic dialogs, nest an internal `SingleChildScrollView(physics: ClampingScrollPhysics())` to scroll gracefully on smaller displays.
+
+### 3.8. Repository-First Git Radar Architecture & Multi-Project Hierarchy
+- **Repository-First Hierarchy**: Git status is tracked per repository root (`RadarRepository`), aggregating all child workspace projects located within that repository. This eliminates duplicate repository cards in monorepos or multi-service workspaces.
+- **Smart "Open" Context Submenus**:
+  - If a repository contains **multiple projects**: the "Open" menu action exposes a nested submenu (`submenu: [...]`) listing each linked project with its tech badge, plus a dedicated action to open the repository root in the user's default editor (`state.settings.defaultEditor`).
+  - If a repository contains **a single project**: clicking "Open" immediately launches that project in its designated editor.
+- **Responsive Single-Row Toolbar**:
+  - Keep command bar headers in a compact single-row layout (`Row` with `crossAxisAlignment: CrossAxisAlignment.center`).
+  - Avoid redundant top title rows when context is already established by sidebar navigation.
+  - Dynamically fold batch action buttons and verbose sort labels into compact icon triggers and the overflow menu (`⋮`) when widths contract (e.g. when inspection sidepanes are expanded) to guarantee zero `RenderFlex` horizontal overflow.
+
 ---
 
 ## 4. State Management & Data Flow
