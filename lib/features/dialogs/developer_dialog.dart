@@ -24,6 +24,7 @@ class DeveloperDialog extends StatelessWidget {
     return ModalScaffold(
       title: 'Developer',
       width: 620,
+      maxHeight: 640,
       onClose: () => state.modal = null,
       actions: [
         Btn(
@@ -33,9 +34,14 @@ class DeveloperDialog extends StatelessWidget {
           onClick: () => state.modal = null,
         ),
       ],
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 520),
+        child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
           // 1. Author & Project Hero Banner
           Container(
             padding: const EdgeInsets.all(14),
@@ -195,22 +201,6 @@ class DeveloperDialog extends StatelessWidget {
           const SizedBox(height: 14),
 
           // 3. Interactive Link Cards
-          if (AppConfig.DEVELOPER_URL.trim().isNotEmpty) ...[
-            _InteractiveLinkCard(
-              label: 'PROFILE',
-              icon: Icons.person_rounded,
-              url: AppConfig.DEVELOPER_URL,
-            ),
-            const SizedBox(height: 10),
-          ],
-          if (AppConfig.HOMEPAGE.trim().isNotEmpty) ...[
-            _InteractiveLinkCard(
-              label: 'PROJECT REPOSITORY',
-              icon: AppIcons.git,
-              url: AppConfig.HOMEPAGE,
-            ),
-            const SizedBox(height: 10),
-          ],
           if (AppConfig.MORE_APPS_URL.trim().isNotEmpty) ...[
             _InteractiveLinkCard(
               label: 'EXPLORE MORE APPS',
@@ -244,7 +234,9 @@ class DeveloperDialog extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ),
+  ),
+);
   }
 }
 

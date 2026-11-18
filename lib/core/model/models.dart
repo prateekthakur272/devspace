@@ -115,6 +115,7 @@ class GitRepoStatus {
   final String? lastTag;
   final String? upstream;
   final String? remoteUrl;
+  final String? repoRoot;
 
   const GitRepoStatus({
     this.isGitRepo = false,
@@ -134,6 +135,7 @@ class GitRepoStatus {
     this.lastTag,
     this.upstream,
     this.remoteUrl,
+    this.repoRoot,
   });
 
   bool get isClean =>
@@ -155,6 +157,72 @@ class GitRepoStatus {
         isGitRepo: false,
         lastChecked: DateTime.now(),
       );
+}
+
+/// Represents a distinct Git Repository linked to one or more DevSpace projects.
+class RadarRepository {
+  final String path;
+  final String name;
+  final GitRepoStatus status;
+  final List<Project> linkedProjects;
+
+  RadarRepository({
+    required this.path,
+    required this.name,
+    required this.status,
+    required this.linkedProjects,
+  });
+}
+
+/// Information about a single git commit.
+class GitCommitInfo {
+  final String hash;
+  final String message;
+  final DateTime? date;
+  final String author;
+
+  const GitCommitInfo({
+    required this.hash,
+    required this.message,
+    this.date,
+    required this.author,
+  });
+
+  String get relativeTime {
+    if (date == null) return '';
+    final diff = DateTime.now().difference(date!);
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays == 1) return 'yesterday';
+    if (diff.inDays < 30) return '${diff.inDays}d ago';
+    if (diff.inDays < 365) return '${(diff.inDays / 30).floor()}mo ago';
+    return '${(diff.inDays / 365).floor()}y ago';
+  }
+}
+
+/// A changed file in git working tree.
+class GitChangedFile {
+  final String path;
+  final String status;
+  final bool isStaged;
+
+  const GitChangedFile({
+    required this.path,
+    required this.status,
+    required this.isStaged,
+  });
+
+  String get statusLabel {
+    switch (status) {
+      case 'M': return 'Modified';
+      case 'A': return 'Added';
+      case 'D': return 'Deleted';
+      case 'R': return 'Renamed';
+      case '?': return 'Untracked';
+      default: return status;
+    }
+  }
 }
 
 /// Individual project entry in DevSpace.
@@ -682,6 +750,10 @@ class SavedState {
   final String searchQuery;
   final ProjectSortOption sortBy;
   final WindowGeometry? window;
+  final String gitRadarFilter;
+  final String? gitRadarRemoteFilter;
+  final String? gitRadarBranchFilter;
+  final String? selectedGitRepoPath;
 
   const SavedState({
     this.sidebarWidth = 270,
@@ -696,6 +768,10 @@ class SavedState {
     this.searchQuery = '',
     this.sortBy = ProjectSortOption.lastOpened,
     this.window,
+    this.gitRadarFilter = 'all',
+    this.gitRadarRemoteFilter,
+    this.gitRadarBranchFilter,
+    this.selectedGitRepoPath,
   });
 
   SavedState copyWith({
@@ -712,6 +788,13 @@ class SavedState {
     String? searchQuery,
     ProjectSortOption? sortBy,
     WindowGeometry? window,
+    String? gitRadarFilter,
+    String? gitRadarRemoteFilter,
+    bool clearGitRadarRemoteFilter = false,
+    String? gitRadarBranchFilter,
+    bool clearGitRadarBranchFilter = false,
+    String? selectedGitRepoPath,
+    bool clearSelectedGitRepoPath = false,
   }) =>
       SavedState(
         sidebarWidth: sidebarWidth ?? this.sidebarWidth,
@@ -726,6 +809,16 @@ class SavedState {
         searchQuery: searchQuery ?? this.searchQuery,
         sortBy: sortBy ?? this.sortBy,
         window: window ?? this.window,
+        gitRadarFilter: gitRadarFilter ?? this.gitRadarFilter,
+        gitRadarRemoteFilter: clearGitRadarRemoteFilter
+            ? null
+            : (gitRadarRemoteFilter ?? this.gitRadarRemoteFilter),
+        gitRadarBranchFilter: clearGitRadarBranchFilter
+            ? null
+            : (gitRadarBranchFilter ?? this.gitRadarBranchFilter),
+        selectedGitRepoPath: clearSelectedGitRepoPath
+            ? null
+            : (selectedGitRepoPath ?? this.selectedGitRepoPath),
       );
 
   Map<String, dynamic> toJson() => {
@@ -741,6 +834,10 @@ class SavedState {
         'searchQuery': searchQuery,
         'sortBy': sortBy.name,
         if (window != null) 'window': window!.toJson(),
+        'gitRadarFilter': gitRadarFilter,
+        if (gitRadarRemoteFilter != null) 'gitRadarRemoteFilter': gitRadarRemoteFilter,
+        if (gitRadarBranchFilter != null) 'gitRadarBranchFilter': gitRadarBranchFilter,
+        if (selectedGitRepoPath != null) 'selectedGitRepoPath': selectedGitRepoPath,
       };
 
   factory SavedState.fromJson(Map<String, dynamic>? m) {
@@ -761,6 +858,10 @@ class SavedState {
         orElse: () => ProjectSortOption.lastOpened,
       ),
       window: m['window'] != null ? WindowGeometry.fromJson(m['window']) : null,
+      gitRadarFilter: m['gitRadarFilter'] as String? ?? 'all',
+      gitRadarRemoteFilter: m['gitRadarRemoteFilter'] as String?,
+      gitRadarBranchFilter: m['gitRadarBranchFilter'] as String?,
+      selectedGitRepoPath: m['selectedGitRepoPath'] as String?,
     );
   }
 }

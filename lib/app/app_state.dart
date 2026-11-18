@@ -66,8 +66,11 @@ class AppState with ChangeNotifier {
     notifyListeners();
   }
 
+  final Set<String> _testingStatusOverrides = {};
+
   @visibleForTesting
   void setGitStatusForTesting(String projectId, GitRepoStatus status) {
+    _testingStatusOverrides.add(projectId);
     _gitStatuses[projectId] = status;
     notifyListeners();
   }
@@ -425,6 +428,66 @@ class AppState with ChangeNotifier {
 
   // --- Git Health Actions ---
 
+  String get gitRadarFilter => _uiState.gitRadarFilter;
+  String? get gitRadarRemoteFilter => _uiState.gitRadarRemoteFilter;
+  String? get gitRadarBranchFilter => _uiState.gitRadarBranchFilter;
+  String? get selectedGitRepoPath => _uiState.selectedGitRepoPath;
+
+  void setGitRadarFilter(String filter) {
+    updateUiState((s) => s.copyWith(
+      gitRadarFilter: filter,
+      clearGitRadarRemoteFilter: true,
+      clearGitRadarBranchFilter: true,
+    ));
+  }
+
+  void setGitRadarRemoteFilter(String? remote) {
+    updateUiState((s) => s.copyWith(
+      gitRadarFilter: 'all',
+      gitRadarRemoteFilter: remote,
+      clearGitRadarRemoteFilter: remote == null,
+      clearGitRadarBranchFilter: true,
+    ));
+  }
+
+  void setGitRadarBranchFilter(String? branch) {
+    updateUiState((s) => s.copyWith(
+      gitRadarFilter: 'all',
+      clearGitRadarRemoteFilter: true,
+      gitRadarBranchFilter: branch,
+      clearGitRadarBranchFilter: branch == null,
+    ));
+  }
+
+  void setSelectedGitRepoPath(String? path) {
+    updateUiState((s) => s.copyWith(
+      selectedGitRepoPath: path,
+      clearSelectedGitRepoPath: path == null,
+    ));
+  }
+
+  List<RadarRepository> get radarRepositories {
+    final Map<String, RadarRepository> repoMap = {};
+    for (final pr in _projects) {
+      final s = _gitStatuses[pr.id];
+      if (s == null || !s.isGitRepo) continue;
+      final repoPath = s.repoRoot ?? pr.path;
+      if (repoMap.containsKey(repoPath)) {
+        repoMap[repoPath]!.linkedProjects.add(pr);
+      } else {
+        final segments = repoPath.split(RegExp(r'[\\/]')).where((part) => part.isNotEmpty).toList();
+        final repoName = segments.isNotEmpty ? segments.last : pr.name;
+        repoMap[repoPath] = RadarRepository(
+          path: repoPath,
+          name: repoName,
+          status: s,
+          linkedProjects: [pr],
+        );
+      }
+    }
+    return repoMap.values.toList();
+  }
+
   Future<void> refreshAllGit() async {
     for (final p in _projects) {
       refreshProjectGit(p);
@@ -432,10 +495,17 @@ class AppState with ChangeNotifier {
   }
 
   Future<void> refreshProjectGit(Project project) async {
+    if (_testingStatusOverrides.contains(project.id)) {
+      return;
+    }
     _gitLoading[project.id] = true;
     notifyListeners();
 
     final status = await GitService.checkStatus(project.path);
+    if (_testingStatusOverrides.contains(project.id)) {
+      _gitLoading[project.id] = false;
+      return;
+    }
     _gitStatuses[project.id] = status;
     _gitLoading[project.id] = false;
     notifyListeners();

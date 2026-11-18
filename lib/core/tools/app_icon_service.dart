@@ -20,6 +20,10 @@ class AppIconService {
   @visibleForTesting
   static String? testCacheDir;
 
+  /// Flag to disable background OS process extraction in widget tests.
+  @visibleForTesting
+  static bool disableExtractionForTesting = false;
+
   /// Directory where converted 64x64 PNG icons are cached.
   static String get cacheDir {
     final dir = testCacheDir ?? p.join(Paths.dataDir, 'app_icons');
@@ -85,6 +89,7 @@ class AppIconService {
 
   /// Extracts the icon for an arbitrary application by its path and name.
   static Future<String?> extractAppIcon(String appPath, String name) async {
+    if (disableExtractionForTesting) return null;
     final sanitized = sanitizeId(name);
     final existing = getIconFile(sanitized);
     if (existing != null) return existing.path;
@@ -99,22 +104,53 @@ class AppIconService {
 
   /// Extracts icons in parallel or batch for a group of apps.
   static Future<void> extractBatch(List<PinnedApp> apps) async {
-    if (apps.isEmpty) return;
+    if (disableExtractionForTesting || apps.isEmpty) return;
 
     if (io.Platform.isMacOS) {
-      final missingPairs = <String>[];
+      final missingApps = <PinnedApp>[];
       for (final app in apps) {
         final sanitized = sanitizeId(app.name);
         final outPath = p.join(cacheDir, '$sanitized.png');
         if (!io.File(outPath).existsSync() && !_cachedIds.contains(sanitized)) {
-          missingPairs.addAll([app.path, outPath]);
+          missingApps.add(app);
         }
       }
 
-      if (missingPairs.isNotEmpty) {
-        final ok = await _extractBatchSwift(missingPairs);
-        if (ok) return;
+      if (missingApps.isEmpty) return;
+
+      // 1. Fast pass: extract via sips on any app that has an .icns
+      final remainingForSwift = <String>[];
+      for (final app in missingApps) {
+        final sanitized = sanitizeId(app.name);
+        final outPath = p.join(cacheDir, '$sanitized.png');
+        final icns = _findMacIcnsPath(app.path, sanitized);
+        if (icns != null) {
+          try {
+            final res = await io.Process.run('sips', [
+              '-s',
+              'format',
+              'png',
+              '-z',
+              '64',
+              '64',
+              icns,
+              '--out',
+              outPath,
+            ]).timeout(const Duration(seconds: 2));
+            if (res.exitCode == 0 && io.File(outPath).existsSync()) {
+              _cachedIds.add(sanitized);
+              continue;
+            }
+          } catch (_) {}
+        }
+        remainingForSwift.addAll([app.path, outPath]);
       }
+
+      // 2. Second pass: invoke NSWorkspace Swift helper only for remaining apps
+      if (remainingForSwift.isNotEmpty) {
+        await _extractBatchSwift(remainingForSwift);
+      }
+      return;
     }
 
     final futures = <Future>[];
@@ -154,7 +190,10 @@ while i + 1 < args.count {
     }
 }
 ''';
-      final res = await io.Process.run('/usr/bin/swift', ['-e', swiftScript, ...pairs]);
+      final res = await io.Process.run(
+        '/usr/bin/swift',
+        ['-e', swiftScript, ...pairs],
+      ).timeout(const Duration(seconds: 8));
       if (res.exitCode == 0) {
         for (int i = 1; i < pairs.length; i += 2) {
           final outPath = pairs[i];
@@ -307,36 +346,17 @@ while i + 1 < args.count {
     await Future.wait(tasks);
   }
 
-  /// Extracts the macOS icon from [appPath] and converts it to a 64x64 PNG.
-  /// Uses native NSWorkspace via Swift (works for all apps including system apps),
-  /// falling back to .icns / sips if needed.
-  static Future<String?> extractMacIcon(String appPath, String id) async {
-    final sanitized = sanitizeId(id);
-    final outPath = p.join(cacheDir, '$sanitized.png');
-
-    if (io.File(outPath).existsSync()) {
-      _cachedIds.add(sanitized);
-      return outPath;
-    }
-
-    // 1. Try native Cocoa NSWorkspace extraction
-    final ok = await _extractBatchSwift([appPath, outPath]);
-    if (ok && io.File(outPath).existsSync()) {
-      _cachedIds.add(sanitized);
-      return outPath;
-    }
-
+  /// Resolves the .icns file path for a macOS app bundle if available.
+  static String? _findMacIcnsPath(String appPath, String sanitized) {
     try {
       final resDir = p.join(appPath, 'Contents', 'Resources');
       if (!io.Directory(resDir).existsSync()) return null;
-
-      String? icnsPath;
 
       // 1. Check CFBundleIconFile from Info.plist via PlistBuddy
       final plistPath = p.join(appPath, 'Contents', 'Info.plist');
       if (io.File(plistPath).existsSync()) {
         try {
-          final plistRes = await io.Process.run('/usr/libexec/PlistBuddy', [
+          final plistRes = io.Process.runSync('/usr/libexec/PlistBuddy', [
             '-c',
             'Print :CFBundleIconFile',
             plistPath,
@@ -347,34 +367,49 @@ while i + 1 < args.count {
               if (!iconName.endsWith('.icns')) iconName = '$iconName.icns';
               final candidate = p.join(resDir, iconName);
               if (io.File(candidate).existsSync()) {
-                icnsPath = candidate;
+                return candidate;
               }
             }
           }
         } catch (_) {}
       }
 
-      // 2. Fallback: inspect Resources directory for .icns files
-      if (icnsPath == null) {
-        final icnsFiles = io.Directory(resDir)
-            .listSync()
-            .whereType<io.File>()
-            .where((f) => f.path.toLowerCase().endsWith('.icns'))
-            .toList();
+      // 2. Scan Directory for .icns
+      final icnsFiles = io.Directory(resDir)
+          .listSync()
+          .whereType<io.File>()
+          .where((f) => f.path.toLowerCase().endsWith('.icns'))
+          .toList();
 
-        if (icnsFiles.isNotEmpty) {
-          // Prefer AppIcon.icns or file matching app name
-          icnsPath = icnsFiles.firstWhere(
-            (f) => p.basename(f.path).toLowerCase().contains('appicon'),
-            orElse: () => icnsFiles.firstWhere(
-              (f) => p.basename(f.path).toLowerCase().contains(sanitized),
-              orElse: () => icnsFiles.first,
-            ),
-          ).path;
-        }
+      if (icnsFiles.isNotEmpty) {
+        return icnsFiles.firstWhere(
+          (f) => p.basename(f.path).toLowerCase().contains('appicon'),
+          orElse: () => icnsFiles.firstWhere(
+            (f) => p.basename(f.path).toLowerCase().contains(sanitized),
+            orElse: () => icnsFiles.first,
+          ),
+        ).path;
       }
+    } catch (_) {}
+    return null;
+  }
 
-      if (icnsPath != null && io.File(icnsPath).existsSync()) {
+  /// Extracts the macOS icon from [appPath] and converts it to a 64x64 PNG.
+  /// Uses native sips on .icns (super fast, ~15ms, built into all macOS versions),
+  /// falling back to native NSWorkspace via Swift.
+  static Future<String?> extractMacIcon(String appPath, String id) async {
+    final sanitized = sanitizeId(id);
+    final outPath = p.join(cacheDir, '$sanitized.png');
+
+    if (io.File(outPath).existsSync()) {
+      _cachedIds.add(sanitized);
+      return outPath;
+    }
+
+    // 1. Fast path: convert native .icns via sips (15ms, no compiler, built into all macOS)
+    final icnsPath = _findMacIcnsPath(appPath, sanitized);
+    if (icnsPath != null && io.File(icnsPath).existsSync()) {
+      try {
         final sipsRes = await io.Process.run('sips', [
           '-s',
           'format',
@@ -385,17 +420,24 @@ while i + 1 < args.count {
           icnsPath,
           '--out',
           outPath,
-        ]);
+        ]).timeout(const Duration(seconds: 3));
 
         if (sipsRes.exitCode == 0 && io.File(outPath).existsSync()) {
           _cachedIds.add(sanitized);
           Log.info(_tag, 'Successfully extracted icon for $id -> $outPath');
           return outPath;
         }
-      }
-    } catch (e) {
-      Log.debug(_tag, 'Failed extracting macOS icon for $appPath: $e');
+      } catch (_) {}
     }
+
+    // 2. Fallback: native Cocoa NSWorkspace extraction
+    final ok = await _extractBatchSwift([appPath, outPath]);
+    if (ok && io.File(outPath).existsSync()) {
+      _cachedIds.add(sanitized);
+      Log.info(_tag, 'Extracted icon via NSWorkspace for $id -> $outPath');
+      return outPath;
+    }
+
     return null;
   }
 

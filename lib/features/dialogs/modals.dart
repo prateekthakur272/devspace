@@ -160,6 +160,7 @@ class _AddProjectDialogState extends State<_AddProjectDialog> {
         ),
       ],
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           T('Project Folder Path', size: 12, weight: FontWeight.w600, color: p.muted),
@@ -332,6 +333,7 @@ class _EditProjectDialogState extends State<_EditProjectDialog> {
         Btn(label: 'Save Changes', primary: true, onClick: _save),
       ],
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           T('Project Path', size: 12, weight: FontWeight.w600, color: p.muted),
@@ -467,7 +469,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         ),
       ],
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 520),
+        constraints: const BoxConstraints(maxHeight: 460),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1480,6 +1482,7 @@ class _SettingsDialogState extends State<_SettingsDialog> {
         border: Border.all(color: p.border, width: 1),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
@@ -1548,6 +1551,7 @@ class _AboutDialog extends StatelessWidget {
         Btn(label: 'Close', primary: true, onClick: () => state.modal = null),
       ],
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Image.asset(
@@ -1671,6 +1675,7 @@ class _ConfirmDeleteDialog extends StatelessWidget {
         ),
       ],
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           T('Are you sure you want to remove "${project.name}" from DevSpace?', size: 13, weight: FontWeight.w500),
@@ -1777,7 +1782,7 @@ class _GitDetailsDialogState extends State<_GitDetailsDialog> {
         ),
       ],
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 520),
+        constraints: const BoxConstraints(maxHeight: 460),
         child: SingleChildScrollView(
           physics: const ClampingScrollPhysics(),
           child: Column(
@@ -2669,6 +2674,7 @@ class _CreateGroupDialogState extends State<_CreateGroupDialog> {
         ),
       ],
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           T('Group Name', size: 12, weight: FontWeight.w600, color: p.muted),
@@ -2772,6 +2778,7 @@ class _EditGroupDialogState extends State<_EditGroupDialog> {
         ),
       ],
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           T('Group Name', size: 12, weight: FontWeight.w600, color: p.muted),
@@ -3117,7 +3124,7 @@ class _PinAppDialogState extends State<_PinAppDialog> {
         ),
       ],
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxHeight: 520),
+        constraints: const BoxConstraints(maxHeight: 460),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3317,14 +3324,22 @@ class _AppIconViewState extends State<_AppIconView> {
   @override
   void initState() {
     super.initState();
-    _resolve();
+    _file = AppIconService.getIconFileForApp(widget.app);
+    if (_file == null) {
+      _resolve();
+    }
   }
 
   @override
   void didUpdateWidget(covariant _AppIconView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.app.path != widget.app.path) {
-      _resolve();
+    if (oldWidget.app.path != widget.app.path || _file == null) {
+      final f = AppIconService.getIconFileForApp(widget.app);
+      if (f != null) {
+        _file = f;
+      } else {
+        _resolve();
+      }
     }
   }
 
@@ -3345,20 +3360,24 @@ class _AppIconViewState extends State<_AppIconView> {
 
   @override
   Widget build(BuildContext context) {
+    final file = _file ?? AppIconService.getIconFileForApp(widget.app);
     return SizedBox(
-      width: 24,
-      height: 24,
-      child: _file != null && _file!.existsSync()
-          ? Image.file(
-              _file!,
-              width: 24,
-              height: 24,
-              fit: BoxFit.contain,
-              filterQuality: FilterQuality.medium,
-              errorBuilder: (context, error, stackTrace) =>
-                  Icon(Icons.apps_rounded, size: 20, color: widget.fallbackColor),
+      width: 28,
+      height: 28,
+      child: file != null && file.existsSync()
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.file(
+                file,
+                width: 28,
+                height: 28,
+                fit: BoxFit.contain,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (context, error, stackTrace) =>
+                    Icon(Icons.apps_rounded, size: 22, color: widget.fallbackColor),
+              ),
             )
-          : Icon(Icons.apps_rounded, size: 20, color: widget.fallbackColor),
+          : Icon(Icons.apps_rounded, size: 22, color: widget.fallbackColor),
     );
   }
 }

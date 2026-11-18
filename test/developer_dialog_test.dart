@@ -203,36 +203,34 @@ void main() {
     await tester.pump();
     expect(fakeLauncher.opened, contains(AppConfig.REPOSITORY));
 
-    // Check link sections
-    expect(find.text('PROFILE'), findsOneWidget);
-    expect(find.text('PROJECT REPOSITORY'), findsOneWidget);
+    // Profile and repository URL sections removed; only Explore More Apps card remains
+    expect(find.text('PROFILE'), findsNothing);
+    expect(find.text('PROJECT REPOSITORY'), findsNothing);
     expect(find.text('EXPLORE MORE APPS'), findsOneWidget);
 
-    // Verify URLs are displayed
-    expect(find.text(AppConfig.DEVELOPER_URL), findsOneWidget);
-    expect(find.text(AppConfig.HOMEPAGE), findsOneWidget);
+    // Verify URLs
     expect(find.text(AppConfig.MORE_APPS_URL), findsOneWidget);
 
     // Verify GitHub mark widget
     expect(find.byType(GitHubIcon), findsWidgets);
 
-    // Test Copy button
+    // Test Copy button (on the remaining link card)
     final copyButtons = find.text('Copy');
-    expect(copyButtons, findsNWidgets(3));
+    expect(copyButtons, findsOneWidget);
 
     await tester.tap(copyButtons.first);
     await tester.pump();
 
     expect(find.text('Copied'), findsOneWidget);
-    expect(copiedText, AppConfig.DEVELOPER_URL);
+    expect(copiedText, AppConfig.MORE_APPS_URL);
 
-    // Test Open button
+    // Test Open button (on the remaining link card)
     final openButtons = find.text('Open');
-    expect(openButtons, findsNWidgets(3));
+    expect(openButtons, findsOneWidget);
 
     await tester.tap(openButtons.first);
     await tester.pump();
-    expect(fakeLauncher.opened, contains(AppConfig.DEVELOPER_URL));
+    expect(fakeLauncher.opened, contains(AppConfig.MORE_APPS_URL));
 
     // Test Close button dismisses modal
     await tester.tap(find.text('Close'));

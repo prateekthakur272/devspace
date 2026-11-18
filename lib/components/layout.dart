@@ -127,6 +127,7 @@ class ModalScaffold extends StatelessWidget {
     required this.onClose,
     this.actions = const [],
     this.width = 540,
+    this.maxHeight,
   });
 
   final String title;
@@ -134,71 +135,89 @@ class ModalScaffold extends StatelessWidget {
   final VoidCallback onClose;
   final List<Widget> actions;
   final double width;
+  final double? maxHeight;
 
   @override
   Widget build(BuildContext context) {
     final p = context.pal;
-    return Center(
-      child: ClickableNoRipple(
-        onClick: () {},
-        child: Container(
-          width: width,
-          margin: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: p.panel,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: p.border, width: 1),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.35),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              DrawBottomBorder(
-                color: p.border,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: T(title, size: 14, weight: FontWeight.w600),
-                      ),
-                      IconBtn(
-                        icon: AppIcons.close,
-                        onClick: onClose,
-                        size: 24,
-                        iconSize: 13,
-                      ),
-                    ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxScreenHeight = constraints.maxHeight;
+        // Total chrome: margins (24 * 2 = 48) + header (~48) + padding (16 * 2 = 32) + footer if present (~56) + borders (2)
+        final chromeHeight = 48 + 48 + 32 + (actions.isNotEmpty ? 56 : 0) + 2;
+        final maxBodyHeight = (maxScreenHeight - chromeHeight).clamp(
+          80.0,
+          maxHeight != null ? (maxHeight! - chromeHeight + 48) : double.infinity,
+        );
+
+        return Center(
+          child: ClickableNoRipple(
+            onClick: () {},
+            child: Container(
+              width: width,
+              margin: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: p.panel,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: p.border, width: 1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.35),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
                   ),
-                ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: child,
-              ),
-              if (actions.isNotEmpty)
-                DrawTopBorder(
-                  color: p.border,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      spacing: 8,
-                      children: actions,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DrawBottomBorder(
+                    color: p.border,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: T(title, size: 14, weight: FontWeight.w600),
+                          ),
+                          IconBtn(
+                            icon: AppIcons.close,
+                            onClick: onClose,
+                            size: 24,
+                            iconSize: 13,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-            ],
+                  ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: maxBodyHeight,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: child,
+                    ),
+                  ),
+                  if (actions.isNotEmpty)
+                    DrawTopBorder(
+                      color: p.border,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          spacing: 8,
+                          children: actions,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
