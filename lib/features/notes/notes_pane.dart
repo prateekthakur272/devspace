@@ -126,6 +126,11 @@ class _NotesPaneState extends State<NotesPane> {
         break;
     }
 
+    list.sort((a, b) {
+      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+      return b.updatedAt.compareTo(a.updatedAt);
+    });
+
     return list;
   }
 

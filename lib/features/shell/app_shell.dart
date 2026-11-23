@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:devspace/app/app_state.dart';
 import 'package:devspace/components/drag_devices.dart';
+import 'package:devspace/components/project_drop_target.dart';
 import 'package:devspace/components/text.dart';
 import 'package:devspace/features/catalog/catalog_view.dart';
 import 'package:devspace/features/catalog/sidebar.dart';
@@ -110,30 +111,42 @@ class AppShell extends StatelessWidget {
                           },
                         ),
                       ],
-                      // Main Content Area with Integrated Bottom Terminal
+                      // Main Content Area with Integrated Bottom Terminal & Drop Target
                       Expanded(
-                        child: Column(
-                          children: [
-                            Expanded(
-                              child: ui.activeTab == 'git_radar'
-                                  ? GitRadarView(state: state)
-                                  : CatalogView(state: state),
-                            ),
-                            if (ui.terminalVisible) ...[
-                              TerminalSplitter(
-                                color: p.border,
-                                onDrag: (delta) {
-                                  state.setTerminalHeight(
-                                    (ui.terminalHeight + delta).clamp(140.0, 600.0),
-                                  );
-                                },
+                        child: ProjectDropTarget(
+                          state: state,
+                          targetWorkspaceName: () {
+                            final wsId = ui.selectedWorkspaceId;
+                            if (wsId == 'all' || wsId == 'pinned' || wsId == 'dirty') return null;
+                            try {
+                              return state.workspaces.firstWhere((w) => w.id == wsId).name;
+                            } catch (_) {
+                              return null;
+                            }
+                          }(),
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: ui.activeTab == 'git_radar'
+                                    ? GitRadarView(state: state)
+                                    : CatalogView(state: state),
                               ),
-                              SizedBox(
-                                height: ui.terminalHeight.clamp(140.0, 600.0),
-                                child: TerminalPanel(state: state),
-                              ),
+                              if (ui.terminalVisible) ...[
+                                TerminalSplitter(
+                                  color: p.border,
+                                  onDrag: (delta) {
+                                    state.setTerminalHeight(
+                                      (ui.terminalHeight + delta).clamp(140.0, 600.0),
+                                    );
+                                  },
+                                ),
+                                SizedBox(
+                                  height: ui.terminalHeight.clamp(140.0, 600.0),
+                                  child: TerminalPanel(state: state),
+                                ),
+                              ],
                             ],
-                          ],
+                          ),
                         ),
                       ),
                       // Right Notes Side Pane

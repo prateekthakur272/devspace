@@ -222,6 +222,23 @@ class _CommandPaletteState extends State<CommandPalette> {
     ));
 
     list.add(_PaletteItem(
+      title: state.settings.openAtLogin
+          ? 'Settings: Disable Open at Login'
+          : 'Settings: Enable Open at Login',
+      subtitle: state.settings.openAtLogin
+          ? 'Stop launching DevSpace automatically on computer startup'
+          : 'Automatically launch DevSpace when logging in to your computer',
+      category: 'Settings',
+      icon: Icons.login_rounded,
+      action: () {
+        state.paletteOpen = false;
+        final next = !state.settings.openAtLogin;
+        state.setOpenAtLogin(next);
+        state.toast = next ? 'Open at Login enabled' : 'Open at Login disabled';
+      },
+    ));
+
+    list.add(_PaletteItem(
       title: 'Pin Application to Toolbar…',
       subtitle: 'Add a desktop application to the quick-launch rail',
       category: 'Actions',

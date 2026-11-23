@@ -42,6 +42,7 @@
 
 ### 1. Unified Project Catalog & Workspaces
 Track projects across multiple hard drives and directories without moving them:
+- **Drag & Drop Import**: Drag any project folder or repository directly from Finder or File Explorer into DevSpace to import it instantly, or drop onto a specific group in the sidebar.
 - **Instant Recognition**: Auto-detects project ecosystems including Flutter, Node.js, Python, Rust, Go, Java, Docker, Ruby, Swift, and C++.
 - **Workspaces & Tags**: Group related projects into custom workspaces (e.g., *Client Work*, *Open Source*, *Personal Experiments*) with color-coded tags.
 - **Favorites & Pinning**: Pin your active projects to anchor them at the very top of your dashboard.

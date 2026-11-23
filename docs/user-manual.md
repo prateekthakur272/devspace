@@ -11,6 +11,11 @@ This guide covers step-by-step instructions for everyday tasks in DevSpace.
 4. Customize the project display name, choose an icon or color tag, assign it to a Workspace, and pick your preferred default editor.
 5. Click **Save Project**.
 
+### Drag & Drop to Add Projects
+- **Instant Folder Drop**: Drag any folder from Finder (macOS) or File Explorer (Windows/Linux) into the DevSpace window. DevSpace immediately registers the folder, detects its tech stack, scans for Git branches and changes, and displays a toast confirmation.
+- **Target Specific Groups**: Drag a folder directly over a specific Workspace Group in the sidebar to add the project straight to that group.
+- **Batch Import**: Select multiple project directories in your file manager and drop them together to import them in bulk.
+
 ### Editing or deleting a project
 - Right-click any project card and choose **Edit Project** to change its name, default editor, group, or custom build scripts.
 - Choose **Remove Project** from the context menu to unregister the project from DevSpace. This **only removes the project from DevSpace configuration**; your files on disk are completely untouched.
@@ -108,7 +113,7 @@ This guide covers step-by-step instructions for everyday tasks in DevSpace.
 ## Settings & Customization
 
 Press **⌘,** (or select **DevSpace ▸ Settings**) to configure:
-- **General**: Theme mode (System, Dark, Light), font scale, and startup behavior.
+- **General**: Theme mode (System, Dark, Light), Open at Login (launch at system startup), automatic repository discovery, and tools quick-launch rail.
 - **Editors**: Configure custom IDE executable paths and command-line arguments.
 - **Git Radar**: Configure background auto-refresh polling intervals (e.g., 1 min, 5 min, 15 min, or manual only).
 - **Terminal**: Choose your preferred terminal application (Terminal, iTerm2, Warp, Alacritty, Kitty, WezTerm, PowerShell, Windows Terminal).

@@ -72,6 +72,7 @@ class _Block {
   final AttrController ctrl;
   final FocusNode focus;
   final GlobalKey key = GlobalKey();
+  final LayerLink link = LayerLink();
   String checkId;
   int lastRev = 0;
 
@@ -121,7 +122,6 @@ class _NoteComposerState extends State<NoteComposer> {
   int _selIdx = 0;
   String _suggKey = '';
   String? _dismissed;
-  final LayerLink _link = LayerLink();
 
   // Find
   int _matchTotal = 0;
@@ -165,6 +165,7 @@ class _NoteComposerState extends State<NoteComposer> {
 
     _buildMentionRe();
     _setBlocks(_initialBlocks(note));
+    _sinkCheckedItems(); // completed items always sit at the end of their list
     _snap(now: true);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -898,10 +899,89 @@ class _NoteComposerState extends State<NoteComposer> {
     _focusBlock(b, offset: b.ctrl.selection.isValid ? b.ctrl.selection.baseOffset : null);
   }
 
+  /// Ticks/unticks a checkbox. Checked items sink to the end of their list
+  /// (with any nested sub-items); unticking moves it back above the completed
+  /// ones.
   void _toggleCheck(_Block b) {
-    setState(() => b.checked = !b.checked);
+    setState(() {
+      b.checked = !b.checked;
+      final i = _blocks.indexOf(b);
+      var end = i + 1;
+      while (end < _blocks.length &&
+          _blocks[end].type == BlockType.todo &&
+          _blocks[end].indent > b.indent) {
+        end++;
+      }
+      final group = _blocks.sublist(i, end);
+      _blocks.removeRange(i, end);
+
+      bool inRun(int k) => _blocks[k].type == BlockType.todo && _blocks[k].indent >= b.indent;
+      var rs = i;
+      while (rs > 0 && inRun(rs - 1)) {
+        rs--;
+      }
+      var re = i;
+      while (re < _blocks.length && inRun(re)) {
+        re++;
+      }
+      var at = i.clamp(rs, re);
+      if (b.checked) {
+        at = re;
+      } else {
+        for (var k = rs; k < re; k++) {
+          if (_blocks[k].indent == b.indent && _blocks[k].checked) {
+            at = k;
+            break;
+          }
+        }
+      }
+      _blocks.insertAll(at, group);
+    });
     _markDirty();
     _snap(now: true);
+  }
+
+  /// Stable-sorts every checklist run so completed items sit at the end of
+  /// their list; sub-items stay attached to their parent and are sorted among
+  /// their own siblings.
+  void _sinkCheckedItems() {
+    List<_Block> sinkRun(List<_Block> run) {
+      if (run.isEmpty) return run;
+      final base = run.map((b) => b.indent).reduce((a, b) => a < b ? a : b);
+      final groups = <List<_Block>>[];
+      for (final b in run) {
+        if (b.indent == base || groups.isEmpty) {
+          groups.add([b]);
+        } else {
+          groups.last.add(b);
+        }
+      }
+      final open = <_Block>[];
+      final done = <_Block>[];
+      for (final g in groups) {
+        final sorted = [g.first, ...sinkRun(g.sublist(1))];
+        (g.first.checked ? done : open).addAll(sorted);
+      }
+      return [...open, ...done];
+    }
+
+    final out = <_Block>[];
+    var i = 0;
+    while (i < _blocks.length) {
+      if (_blocks[i].type != BlockType.todo) {
+        out.add(_blocks[i++]);
+        continue;
+      }
+      var j = i;
+      while (j < _blocks.length && _blocks[j].type == BlockType.todo) {
+        j++;
+      }
+      out.addAll(sinkRun(_blocks.sublist(i, j)));
+      i = j;
+    }
+    _blocks
+      ..clear()
+      ..addAll(out);
   }
 
   void _setAllChecked(bool v) {
@@ -909,6 +989,7 @@ class _NoteComposerState extends State<NoteComposer> {
       for (final b in _blocks) {
         if (b.type == BlockType.todo) b.checked = v;
       }
+      _sinkCheckedItems();
     });
     _markDirty();
     _snap(now: true);
@@ -1365,7 +1446,7 @@ class _NoteComposerState extends State<NoteComposer> {
               ),
               IconBtn(
                 icon: _pinned ? AppIcons.pin : AppIcons.unpin,
-                tooltip: _pinned ? 'Unpin' : 'Pin to top',
+                tooltip: _pinned ? 'Unpin note' : 'Pin note to top',
                 size: 28,
                 iconSize: 15,
                 color: _pinned ? p.accent : p.muted,
@@ -1374,20 +1455,23 @@ class _NoteComposerState extends State<NoteComposer> {
                   _markDirty();
                 },
               ),
-              ClickableNoRipple(
-                onClick: () => setState(() => _showColors = !_showColors),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 5),
-                  child: Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _color ?? p.field,
-                      border: Border.all(color: _showColors ? p.accent : p.border, width: 1.5),
+              Tooltip(
+                message: 'Note color',
+                child: ClickableNoRipple(
+                  onClick: () => setState(() => _showColors = !_showColors),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    child: Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _color ?? p.field,
+                        border: Border.all(color: _showColors ? p.accent : p.border, width: 1.5),
+                      ),
+                      child: Icon(Icons.palette_outlined,
+                          size: 12, color: _color != null ? Colors.white : p.muted),
                     ),
-                    child: Icon(Icons.palette_outlined,
-                        size: 12, color: _color != null ? Colors.white : p.muted),
                   ),
                 ),
               ),
@@ -1683,7 +1767,11 @@ class _NoteComposerState extends State<NoteComposer> {
       onTapOutside: (_) {},
       style: TextStyle(
           fontSize: _fontSize + 8, fontWeight: FontWeight.w800, color: p.text, height: 1.25),
-      cursorColor: p.accent,
+      cursorColor: p.text,
+      cursorWidth: 2.0,
+      cursorHeight: (_fontSize + 8) * 1.15,
+      cursorRadius: const Radius.circular(1.0),
+      cursorOpacityAnimates: true,
       maxLines: null,
       decoration: InputDecoration.collapsed(
         hintText: 'Title',
@@ -1788,7 +1876,11 @@ class _NoteComposerState extends State<NoteComposer> {
       keyboardType: TextInputType.multiline,
       onTapOutside: (_) {},
       style: style,
-      cursorColor: accent,
+      cursorColor: p.text,
+      cursorWidth: 2.0,
+      cursorHeight: (style.fontSize ?? _fontSize) * 1.2,
+      cursorRadius: const Radius.circular(1.0),
+      cursorOpacityAnimates: true,
       decoration: InputDecoration.collapsed(
         hintText: _hint(b),
         hintStyle: style.copyWith(
@@ -1880,7 +1972,7 @@ class _NoteComposerState extends State<NoteComposer> {
     return Padding(
       key: b.key,
       padding: EdgeInsets.only(top: top, bottom: 1, left: b.indent * 24.0),
-      child: b.focus.hasFocus ? CompositedTransformTarget(link: _link, child: row) : row,
+      child: CompositedTransformTarget(link: b.link, child: row),
     );
   }
 
@@ -1894,7 +1986,7 @@ class _NoteComposerState extends State<NoteComposer> {
     }
     final sel = _selIdx.clamp(0, s.chips.length - 1);
     return CompositedTransformFollower(
-      link: _link,
+      link: _target.link,
       showWhenUnlinked: false,
       targetAnchor: above ? Alignment.topLeft : Alignment.bottomLeft,
       followerAnchor: above ? Alignment.bottomLeft : Alignment.topLeft,

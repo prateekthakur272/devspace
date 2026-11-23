@@ -45,8 +45,37 @@ void main() {
     expect(NoteMarkdown.plain('# T\n**b** x\n- [ ] item'), 'T\nb x');
   });
 
-  test('toggleTodoLine flips nth checkbox', () {
-    expect(NoteMarkdown.toggleTodoLine('a\n- [ ] x\n- [ ] y', 1), 'a\n- [ ] x\n- [x] y');
+  group('toggleTodoAndSort', () {
+    test('checking moves the item to the end of its list', () {
+      final r = NoteMarkdown.toggleTodoAndSort('a\n- [ ] x\n- [ ] y\n- [ ] z', 0)!;
+      expect(r.md, 'a\n- [ ] y\n- [ ] z\n- [x] x');
+      expect(r.order, [1, 2, 0]);
+    });
+
+    test('checked items stay below unchecked; new check goes last', () {
+      final r = NoteMarkdown.toggleTodoAndSort('- [ ] a\n- [x] b\n- [ ] c', 0)!;
+      expect(r.md, '- [x] b\n- [ ] c\n- [x] a');
+    });
+
+    test('unchecking returns the item above the completed ones', () {
+      final r = NoteMarkdown.toggleTodoAndSort('- [ ] a\n- [x] b\n- [x] c', 2)!;
+      expect(r.md, '- [ ] a\n- [ ] c\n- [x] b');
+      expect(r.order, [0, 2, 1]);
+    });
+
+    test('sub-items travel with their parent', () {
+      final r = NoteMarkdown.toggleTodoAndSort('- [ ] a\n  - [ ] a1\n- [ ] b', 0)!;
+      expect(r.md, '- [ ] b\n- [x] a\n  - [ ] a1');
+    });
+
+    test('only reorders within the contiguous list', () {
+      final r = NoteMarkdown.toggleTodoAndSort('- [ ] a\n- [ ] b\ntext\n- [ ] c', 0)!;
+      expect(r.md, '- [ ] b\n- [x] a\ntext\n- [ ] c');
+    });
+
+    test('missing index returns null', () {
+      expect(NoteMarkdown.toggleTodoAndSort('- [ ] a', 3), isNull);
+    });
   });
 
   test('tags / urls derived from text', () {

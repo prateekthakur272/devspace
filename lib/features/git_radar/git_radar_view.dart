@@ -5,6 +5,7 @@ import 'package:devspace/app/app_state.dart';
 import 'package:devspace/components/buttons.dart';
 import 'package:devspace/components/context_menu.dart';
 import 'package:devspace/components/drag_devices.dart';
+import 'package:devspace/components/ide_icon.dart';
 import 'package:devspace/components/layout.dart';
 import 'package:devspace/components/modifiers.dart';
 import 'package:devspace/components/text.dart';
@@ -1763,7 +1764,7 @@ class _GitRadarViewState extends State<GitRadarView> {
                 if (status.aheadCount > 0) ...[
                   IconBtn(
                     icon: AppIcons.push,
-                    tooltip: 'Push ${status.aheadCount} commits to remote',
+                    tooltip: 'Push ${status.aheadCount} ${status.aheadCount == 1 ? "commit" : "commits"} to remote',
                     size: 28,
                     iconSize: 14,
                     color: p.accent,
@@ -1782,7 +1783,7 @@ class _GitRadarViewState extends State<GitRadarView> {
                 if (status.behindCount > 0) ...[
                   IconBtn(
                     icon: AppIcons.pull,
-                    tooltip: 'Pull ${status.behindCount} commits from remote',
+                    tooltip: 'Pull ${status.behindCount} ${status.behindCount == 1 ? "commit" : "commits"} from remote',
                     size: 28,
                     iconSize: 14,
                     color: p.err,
@@ -2252,7 +2253,10 @@ class _GitRadarViewState extends State<GitRadarView> {
                     if (repo.linkedProjects.length > 1)
                       Builder(
                         builder: (btnCtx) => Btn(
-                          icon: AppIcons.code,
+                          leading: IdeIcon(
+                            editor: repo.linkedProjects.first.defaultEditor,
+                            size: 14,
+                          ),
                           label: 'Open ▾',
                           height: 26,
                           fontSize: 10.5,
@@ -2267,7 +2271,10 @@ class _GitRadarViewState extends State<GitRadarView> {
                       )
                     else if (repo.linkedProjects.length == 1)
                       Btn(
-                        icon: AppIcons.code,
+                        leading: IdeIcon(
+                          editor: repo.linkedProjects.first.defaultEditor,
+                          size: 14,
+                        ),
                         label: 'Open',
                         height: 26,
                         fontSize: 10.5,
@@ -2275,7 +2282,10 @@ class _GitRadarViewState extends State<GitRadarView> {
                       )
                     else
                       Btn(
-                        icon: AppIcons.code,
+                        leading: IdeIcon(
+                          editor: widget.state.settings.defaultEditor,
+                          size: 14,
+                        ),
                         label: 'Open',
                         height: 26,
                         fontSize: 10.5,
@@ -2868,7 +2878,10 @@ class _GitRadarViewState extends State<GitRadarView> {
                       child: T(proj.name, size: 12, weight: FontWeight.w700, color: p.text),
                     ),
                     Btn(
-                      icon: AppIcons.code,
+                      leading: IdeIcon(
+                        editor: proj.defaultEditor,
+                        size: 13,
+                      ),
                       label: 'Open',
                       height: 24,
                       fontSize: 10.5,

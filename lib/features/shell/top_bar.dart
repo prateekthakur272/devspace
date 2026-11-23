@@ -4,6 +4,7 @@ import 'package:devspace/components/buttons.dart';
 import 'package:devspace/components/context_menu.dart';
 import 'package:devspace/components/text.dart';
 import 'package:devspace/core/model/models.dart';
+import 'package:devspace/platform/platform.dart';
 import 'package:devspace/theme/icons.dart';
 import 'package:devspace/theme/theme.dart';
 import 'package:devspace/utils/app_config.dart';
@@ -162,8 +163,8 @@ class _AppTopBarState extends State<AppTopBar> {
           IconBtn(
             icon: AppIcons.terminal,
             tooltip: state.uiState.terminalVisible
-                ? 'Hide Integrated Terminal (⌘`)'
-                : 'Show Integrated Terminal (⌘`)',
+                ? 'Hide Integrated Terminal (${Platform.isMac ? "⌘`" : "Ctrl+`"})'
+                : 'Show Integrated Terminal (${Platform.isMac ? "⌘`" : "Ctrl+`"})',
             size: 34,
             iconSize: 15,
             active: state.uiState.terminalVisible,

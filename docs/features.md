@@ -4,6 +4,7 @@ DevSpace provides an integrated, keyboard-friendly command center for developers
 
 ## 1. Unified Project Catalog
 
+- **Desktop Drag & Drop**: Drag any project folder or repository from Finder / File Explorer into the window to add it instantly, with support for batch folder imports and dropping onto specific sidebar groups.
 - **Zero Project Relocation**: Register projects from anywhere on your filesystem without altering folder structures or symlinking.
 - **Smart Ecosystem Detection**: Automatically recognizes project frameworks and tech stacks (Flutter, Node.js, Python, Rust, Go, Java, Docker, Ruby, Swift, C++, PHP).
 - **Pinning & Favorites**: Pin your high-priority daily projects to the top of the catalog.

@@ -358,23 +358,70 @@ class NoteMarkdown {
   static bool hasTodoLines(String md) =>
       md.split('\n').any((l) => _todoLine.hasMatch(l));
 
-  /// Toggles the [index]-th checklist line in [md]. Returns null if absent.
-  static String? toggleTodoLine(String md, int index) {
+  /// Toggles the [index]-th checklist line in [md] and moves it (with its
+  /// nested sub-items) to the end of its list when checked, or back above the
+  /// completed items when unchecked. Returns the new markdown and the new
+  /// order of the checklist items (old indices), or null if absent.
+  static ({String md, List<int> order})? toggleTodoAndSort(String md, int index) {
     final lines = md.split('\n');
-    var n = 0;
-    for (var i = 0; i < lines.length; i++) {
-      final m = _todoLine.firstMatch(lines[i]);
-      if (m == null) continue;
-      if (n++ == index) {
-        final checked = m.group(2)!.toLowerCase() == 'x';
-        lines[i] = lines[i].replaceFirst(
+    final todoIdx = <int, int>{}; // line -> checklist index
+    for (var i = 0, n = 0; i < lines.length; i++) {
+      if (_todoLine.hasMatch(lines[i])) todoIdx[i] = n++;
+    }
+    final li = todoIdx.entries
+        .firstWhere((e) => e.value == index, orElse: () => const MapEntry(-1, -1))
+        .key;
+    if (li < 0) return null;
+
+    final entries = [
+      for (var i = 0; i < lines.length; i++) (text: lines[i], orig: i),
+    ];
+    bool isTodo(int i) => _todoLine.hasMatch(entries[i].text);
+    int indent(int i) => _indentOf(_todoLine.firstMatch(entries[i].text)!.group(1)!);
+    bool checked(int i) =>
+        _todoLine.firstMatch(entries[i].text)!.group(2)!.toLowerCase() == 'x';
+
+    final flipped = entries[li].text.replaceFirst(
           RegExp(r'\[[ xX]\]'),
-          checked ? '[ ]' : '[x]',
+          checked(li) ? '[ ]' : '[x]',
         );
-        return lines.join('\n');
+    entries[li] = (text: flipped, orig: entries[li].orig);
+    final nowChecked = checked(li);
+    final base = indent(li);
+
+    var end = li + 1;
+    while (end < entries.length && isTodo(end) && indent(end) > base) {
+      end++;
+    }
+    final group = entries.sublist(li, end);
+    entries.removeRange(li, end);
+
+    var rs = li;
+    while (rs > 0 && isTodo(rs - 1) && indent(rs - 1) >= base) {
+      rs--;
+    }
+    var re = li;
+    while (re < entries.length && isTodo(re) && indent(re) >= base) {
+      re++;
+    }
+    var at = li.clamp(rs, re);
+    if (nowChecked) {
+      at = re;
+    } else {
+      for (var k = rs; k < re; k++) {
+        if (indent(k) == base && checked(k)) {
+          at = k;
+          break;
+        }
       }
     }
-    return null;
+    entries.insertAll(at, group);
+
+    final order = [
+      for (final e in entries)
+        if (todoIdx.containsKey(e.orig)) todoIdx[e.orig]!,
+    ];
+    return (md: entries.map((e) => e.text).join('\n'), order: order);
   }
 
   static int todoLineCount(String md) =>

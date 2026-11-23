@@ -123,43 +123,27 @@ class NoteCard extends StatelessWidget {
     );
   }
 
-  /// Header row: project badges on the left, pin + menu on the right end.
-  Widget _header(BuildContext context, Pal p, Color accent) {
-    final projects =
-        [for (final id in note.projectIds) _project(id)].whereType<Project>().toList();
+  /// Header row: note title on the left, pin + menu on the right end.
+  Widget _header(BuildContext context, Pal p, Color accent, String displayTitle, bool hasCustomTitle) {
     return Padding(
       padding: const EdgeInsets.only(left: 12, right: 6, top: 6),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: Row(
-              children: [
-                if (projects.isEmpty)
-                  Icon(AppIcons.note, size: 13, color: p.muted)
-                else ...[
-                  for (final pr in projects.take(2))
-                    Flexible(
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: _pill(
-                          p,
-                          pr.name,
-                          pr.techStack.color,
-                          dot: true,
-                          maxWidth: 140,
-                          onTap: onSelectProject == null
-                              ? null
-                              : () => onSelectProject!(pr.id),
-                        ),
-                      ),
-                    ),
-                  if (projects.length > 2)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 2, right: 4),
-                      child: T('+${projects.length - 2}', size: 10.5, color: p.muted),
-                    ),
-                ],
-              ],
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2, right: 4),
+              child: Text(
+                displayTitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  height: 1.3,
+                  fontWeight: FontWeight.w700,
+                  color: hasCustomTitle ? p.text : p.muted,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 4),
@@ -195,6 +179,13 @@ class NoteCard extends StatelessWidget {
     final done = note.checklist.where((c) => c.checked).length;
     final total = note.checklist.length;
     final title = note.title.trim();
+    final hasCustomTitle = title.isNotEmpty;
+    final displayTitle = hasCustomTitle
+        ? title
+        : (preview.isEmpty && !hasList ? 'Empty note' : 'Untitled');
+
+    final projects =
+        [for (final id in note.projectIds) _project(id)].whereType<Project>().toList();
 
     // Show unchecked first so the card surfaces what's left to do.
     final ordered = [
@@ -213,29 +204,31 @@ class NoteCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(height: 8),
-        // Title
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: Text(
-                  title.isNotEmpty ? title : (preview.isEmpty && !hasList ? 'Empty note' : 'Untitled'),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 14.5,
-                    height: 1.3,
-                    fontWeight: FontWeight.w700,
-                    color: title.isNotEmpty ? p.text : p.muted,
-                  ),
+        if (projects.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: [
+              for (final pr in projects.take(2))
+                _pill(
+                  p,
+                  pr.name,
+                  pr.techStack.color,
+                  dot: true,
+                  maxWidth: 140,
+                  onTap: onSelectProject == null
+                      ? null
+                      : () => onSelectProject!(pr.id),
                 ),
-              ),
-            ),
-          ],
-        ),
+              if (projects.length > 2)
+                Padding(
+                  padding: const EdgeInsets.only(left: 2, top: 2),
+                  child: T('+${projects.length - 2}', size: 10.5, color: p.muted),
+                ),
+            ],
+          ),
+        ],
         if (preview.isNotEmpty) ...[
           const SizedBox(height: 6),
           Text(
@@ -360,7 +353,7 @@ class NoteCard extends StatelessWidget {
     );
 
     final padded = Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: body);
-    final head = _header(context, p, accent);
+    final head = _header(context, p, accent, displayTitle, hasCustomTitle);
 
     if (!fillHeight) {
       return Column(

@@ -84,8 +84,8 @@ class StatusBar extends StatelessWidget {
                       IconBtn(
                         icon: AppIcons.sidebar,
                         tooltip: ui.sidebarVisible
-                            ? 'Hide Sidebar'
-                            : 'Show Sidebar',
+                            ? 'Hide Sidebar (${Platform.isMac ? "⌘B" : "Ctrl+B"})'
+                            : 'Show Sidebar (${Platform.isMac ? "⌘B" : "Ctrl+B"})',
                         size: 20,
                         iconSize: 13,
                         color: ui.sidebarVisible ? p.accent : p.muted,
@@ -96,7 +96,7 @@ class StatusBar extends StatelessWidget {
                       const SizedBox(width: 4),
                       IconBtn(
                         icon: AppIcons.settings,
-                        tooltip: 'Preferences',
+                        tooltip: 'Preferences (${Platform.isMac ? "⌘," : "Ctrl+,"})',
                         size: 20,
                         iconSize: 13,
                         color: p.muted,
@@ -284,7 +284,7 @@ class StatusBar extends StatelessWidget {
                               ],
                             ],
                           ),
-                          tooltip: 'Combined Git Status (click to view radar)',
+                          tooltip: 'Git Status (click to view radar)',
                         ),
                         const SizedBox(width: 14),
                       ],
@@ -313,8 +313,7 @@ class StatusBar extends StatelessWidget {
                                 ),
                             ],
                           ),
-                          tooltip:
-                              'Installed Developer Tools & IDEs (click to inspect)',
+                          tooltip: 'Installed Developer Tools & IDEs',
                         ),
                         const SizedBox(width: 14),
                       ],
@@ -334,7 +333,7 @@ class StatusBar extends StatelessWidget {
                               ),
                             ],
                           ),
-                          tooltip: 'Default IDE (click to change in settings)',
+                          tooltip: 'Default Editor: ${state.settings.defaultEditor.label}',
                         ),
                         const SizedBox(width: 14),
                       ],
@@ -354,7 +353,7 @@ class StatusBar extends StatelessWidget {
                             T('commands', size: 11, color: p.muted),
                           ],
                         ),
-                        tooltip: 'Open Command Palette',
+                        tooltip: 'Open Command Palette (${Platform.isMac ? "⌘K" : "Ctrl+K"})',
                       ),
                     ],
                   ),

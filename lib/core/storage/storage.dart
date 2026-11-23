@@ -320,7 +320,10 @@ class AppStore {
               Log.warning(_tag, 'Failed to parse note file: ${f.path}', e, st);
             }
           }
-          notes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          notes.sort((a, b) {
+            if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+            return b.updatedAt.compareTo(a.updatedAt);
+          });
           return notes;
         }
       }
@@ -336,6 +339,10 @@ class AppStore {
               .where((n) => !n.isEmpty)
               .toList();
           if (legacyNotes.isNotEmpty) {
+            legacyNotes.sort((a, b) {
+              if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+              return b.updatedAt.compareTo(a.updatedAt);
+            });
             saveNotes(legacyNotes);
             try {
               legacyFile.renameSync('${legacyFile.path}.migrated');

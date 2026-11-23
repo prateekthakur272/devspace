@@ -12,6 +12,7 @@ import 'package:devspace/core/terminal/terminal_controller.dart';
 import 'package:devspace/core/tools/app_icon_service.dart';
 import 'package:devspace/core/tools/desktop_app_service.dart';
 import 'package:devspace/core/tools/tool_detection_service.dart';
+import 'package:devspace/platform/launch_at_startup.dart';
 import 'package:devspace/platform/platform.dart';
 
 export 'package:devspace/app/modal.dart';
@@ -121,6 +122,7 @@ class AppState with ChangeNotifier {
     _projects = AppStore.loadProjects().toList();
     _workspaces = AppStore.loadWorkspaces().toList();
     _notes = AppStore.loadNotes().where((n) => !n.isEmpty).toList();
+    _sortNotes();
     _uiState = AppStore.loadState();
     terminalController = TerminalController();
     terminalController.addListener(notifyListeners);
@@ -138,6 +140,9 @@ class AppState with ChangeNotifier {
 
     // Auto-detect installed editors and developer tools
     refreshDetectedTools();
+
+    // Sync Open at Login OS registration if enabled
+    _syncOpenAtLogin();
 
     // Launch initial onboarding tour on first run
     if (AppStore.needsOnboarding) {
@@ -195,6 +200,27 @@ class AppState with ChangeNotifier {
     AppStore.saveSettings(_settings);
     _scheduleGitPolling();
     notifyListeners();
+  }
+
+  /// Toggles whether DevSpace launches automatically at user login / system startup.
+  Future<void> setOpenAtLogin(bool enable) async {
+    _settings = _settings.copyWith(openAtLogin: enable);
+    AppStore.saveSettings(_settings);
+    await LaunchAtStartup.setEnabled(enable);
+    notifyListeners();
+  }
+
+  Future<void> _syncOpenAtLogin() async {
+    try {
+      if (_settings.openAtLogin) {
+        final enabled = await LaunchAtStartup.isEnabled();
+        if (!enabled) {
+          await LaunchAtStartup.setEnabled(true);
+        }
+      }
+    } catch (e, st) {
+      Log.warning(_tag, 'Failed syncing open at login state', e, st);
+    }
   }
 
   List<PinnedApp> get pinnedApps => _settings.pinnedApps;
@@ -593,9 +619,17 @@ class AppState with ChangeNotifier {
 
   // --- Notes Management ---
 
+  void _sortNotes() {
+    _notes.sort((a, b) {
+      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+      return b.updatedAt.compareTo(a.updatedAt);
+    });
+  }
+
   void addNote(Note note) {
     if (note.isEmpty) return;
     _notes.insert(0, note);
+    _sortNotes();
     AppStore.saveNotes(_notes);
     notifyListeners();
   }
@@ -608,8 +642,9 @@ class AppState with ChangeNotifier {
     final idx = _notes.indexWhere((n) => n.id == updated.id);
     if (idx != -1) {
       _notes[idx] = updated.copyWith(updatedAt: DateTime.now());
+      _sortNotes();
       if (_paneEditingNote?.id == updated.id) {
-        _paneEditingNote = _notes[idx];
+        _paneEditingNote = _notes.firstWhere((n) => n.id == updated.id);
       }
       AppStore.saveNotes(_notes);
       notifyListeners();
@@ -634,6 +669,7 @@ class AppState with ChangeNotifier {
         pinned: !note.pinned,
         updatedAt: DateTime.now(),
       );
+      _sortNotes();
       AppStore.saveNotes(_notes);
       notifyListeners();
     }
@@ -645,29 +681,41 @@ class AppState with ChangeNotifier {
       final note = _notes[idx];
       // Keep the markdown body (source of truth for the editor) in sync.
       var content = note.content;
-      final ci = note.checklist.indexWhere((c) => c.id == itemId);
-      if (ci >= 0 &&
-          NoteMarkdown.todoLineCount(content) == note.checklist.length) {
-        content = NoteMarkdown.toggleTodoLine(content, ci) ?? content;
-      }
-      final newChecklist = note.checklist.map((item) {
+      var newChecklist = note.checklist.map((item) {
         if (item.id == itemId) {
           return item.copyWith(checked: !item.checked);
         }
         return item;
       }).toList();
+      final ci = note.checklist.indexWhere((c) => c.id == itemId);
+      if (ci >= 0 &&
+          NoteMarkdown.todoLineCount(content) == note.checklist.length) {
+        // Checked items sink to the end of their list (and come back up when
+        // unchecked), in the body and in the checklist model alike.
+        final r = NoteMarkdown.toggleTodoAndSort(content, ci);
+        if (r != null) {
+          content = r.md;
+          newChecklist = [for (final i in r.order) newChecklist[i]];
+        }
+      }
       _notes[idx] = note.copyWith(
         content: content,
         checklist: newChecklist,
         updatedAt: DateTime.now(),
       );
+      _sortNotes();
       AppStore.saveNotes(_notes);
       notifyListeners();
     }
   }
 
   List<Note> getNotesForProject(String projectId) {
-    return _notes.where((n) => n.projectIds.contains(projectId)).toList();
+    final list = _notes.where((n) => n.projectIds.contains(projectId)).toList();
+    list.sort((a, b) {
+      if (a.pinned != b.pinned) return a.pinned ? -1 : 1;
+      return b.updatedAt.compareTo(a.updatedAt);
+    });
+    return list;
   }
 
   void toggleNotesPane() {

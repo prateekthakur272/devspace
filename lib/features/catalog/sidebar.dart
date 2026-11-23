@@ -3,6 +3,7 @@ import 'package:devspace/app/app_state.dart';
 import 'package:devspace/components/buttons.dart';
 import 'package:devspace/components/context_menu.dart';
 import 'package:devspace/components/modifiers.dart';
+import 'package:devspace/components/project_drop_target.dart';
 import 'package:devspace/components/text.dart';
 import 'package:devspace/core/git/git_service.dart';
 import 'package:devspace/core/ide/ide_service.dart';
@@ -150,77 +151,11 @@ class WorkspaceSidebar extends StatelessWidget {
           ),
         ),
         for (final ws in state.workspaces)
-          Builder(
-            builder: (ctx) => _SidebarItem(
-              label: ws.name,
-              dotColor: ws.color,
-              icon: ws.icon,
-              count: state.projects.where((pr) => pr.workspaceId == ws.id).length,
-              active: ui.selectedWorkspaceId == ws.id,
-              onClick: () => state.updateUiState(
-                (s) => s.copyWith(selectedWorkspaceId: ws.id, activeTagFilter: null),
-              ),
-              trailingActions: [
-                IconBtn(
-                  icon: AppIcons.add,
-                  tooltip: 'Add project to ${ws.name}',
-                  size: 24,
-                  iconSize: 13,
-                  onClick: () => state.modal = ModalAddProject(initialWorkspaceId: ws.id),
-                ),
-                const SizedBox(width: 2),
-                IconBtn(
-                  icon: AppIcons.moreVert,
-                  tooltip: 'More options',
-                  size: 24,
-                  iconSize: 15,
-                  onClick: () {
-                    final box = ctx.findRenderObject() as RenderBox?;
-                    if (box != null) {
-                      final pos = box.localToGlobal(Offset.zero) + const Offset(120, 20);
-                      ContextMenu.show(context, pos, [
-                        ContextMenuItem(
-                          label: 'Edit Group…',
-                          icon: AppIcons.edit,
-                          action: () => state.modal = ModalEditGroup(ws),
-                        ),
-                        if (ws.id != 'default') ...[
-                          const ContextMenuItem(label: ''),
-                          ContextMenuItem(
-                            label: 'Delete Group',
-                            icon: AppIcons.delete,
-                            danger: true,
-                            action: () => state.removeWorkspaceGroup(ws.id),
-                          ),
-                        ],
-                      ]);
-                    }
-                  },
-                ),
-              ],
-              onSecondaryTap: () {
-                final box = ctx.findRenderObject() as RenderBox?;
-                if (box != null) {
-                  final pos = box.localToGlobal(Offset.zero) + const Offset(120, 20);
-                  ContextMenu.show(context, pos, [
-                    ContextMenuItem(
-                      label: 'Edit Group…',
-                      icon: AppIcons.edit,
-                      action: () => state.modal = ModalEditGroup(ws),
-                    ),
-                    if (ws.id != 'default') ...[
-                      const ContextMenuItem(label: ''),
-                      ContextMenuItem(
-                        label: 'Delete Group',
-                        icon: AppIcons.delete,
-                        danger: true,
-                        action: () => state.removeWorkspaceGroup(ws.id),
-                      ),
-                    ],
-                  ]);
-                }
-              },
-            ),
+          _WorkspaceGroupSidebarItem(
+            state: state,
+            ws: ws,
+            count: state.projects.where((pr) => pr.workspaceId == ws.id).length,
+            active: ui.selectedWorkspaceId == ws.id,
           ),
         if (allTags.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -702,6 +637,114 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
+class _WorkspaceGroupSidebarItem extends StatefulWidget {
+  const _WorkspaceGroupSidebarItem({
+    required this.state,
+    required this.ws,
+    required this.active,
+    required this.count,
+  });
+
+  final AppState state;
+  final WorkspaceGroup ws;
+  final bool active;
+  final int count;
+
+  @override
+  State<_WorkspaceGroupSidebarItem> createState() => _WorkspaceGroupSidebarItemState();
+}
+
+class _WorkspaceGroupSidebarItemState extends State<_WorkspaceGroupSidebarItem> {
+  bool _isDraggingOver = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final ws = widget.ws;
+    final state = widget.state;
+
+    return ProjectDropTarget(
+      state: state,
+      targetWorkspaceId: ws.id,
+      targetWorkspaceName: ws.name,
+      showOverlay: false,
+      onDragStateChanged: (dragging) => setState(() => _isDraggingOver = dragging),
+      child: Builder(
+        builder: (ctx) => _SidebarItem(
+          label: ws.name,
+          dotColor: ws.color,
+          icon: ws.icon,
+          count: widget.count,
+          active: widget.active,
+          isDropHovered: _isDraggingOver,
+          onClick: () => state.updateUiState(
+            (s) => s.copyWith(selectedWorkspaceId: ws.id, activeTagFilter: null),
+          ),
+          trailingActions: [
+            IconBtn(
+              icon: AppIcons.add,
+              tooltip: 'Add project to ${ws.name}',
+              size: 24,
+              iconSize: 13,
+              onClick: () => state.modal = ModalAddProject(initialWorkspaceId: ws.id),
+            ),
+            const SizedBox(width: 2),
+            IconBtn(
+              icon: AppIcons.moreVert,
+              tooltip: 'More options',
+              size: 24,
+              iconSize: 15,
+              onClick: () {
+                final box = ctx.findRenderObject() as RenderBox?;
+                if (box != null) {
+                  final pos = box.localToGlobal(Offset.zero) + const Offset(120, 20);
+                  ContextMenu.show(context, pos, [
+                    ContextMenuItem(
+                      label: 'Edit Group…',
+                      icon: AppIcons.edit,
+                      action: () => state.modal = ModalEditGroup(ws),
+                    ),
+                    if (ws.id != 'default') ...[
+                      const ContextMenuItem(label: ''),
+                      ContextMenuItem(
+                        label: 'Delete Group',
+                        icon: AppIcons.delete,
+                        danger: true,
+                        action: () => state.removeWorkspaceGroup(ws.id),
+                      ),
+                    ],
+                  ]);
+                }
+              },
+            ),
+          ],
+          onSecondaryTap: () {
+            final box = ctx.findRenderObject() as RenderBox?;
+            if (box != null) {
+              final pos = box.localToGlobal(Offset.zero) + const Offset(120, 20);
+              ContextMenu.show(context, pos, [
+                ContextMenuItem(
+                  label: 'Edit Group…',
+                  icon: AppIcons.edit,
+                  action: () => state.modal = ModalEditGroup(ws),
+                ),
+                if (ws.id != 'default') ...[
+                  const ContextMenuItem(label: ''),
+                  ContextMenuItem(
+                    label: 'Delete Group',
+                    icon: AppIcons.delete,
+                    danger: true,
+                    action: () => state.removeWorkspaceGroup(ws.id),
+                  ),
+                ],
+              ]);
+            }
+          },
+        ),
+      ),
+    );
+  }
+}
+
 class _SidebarItem extends StatelessWidget {
   const _SidebarItem({
     required this.label,
@@ -713,6 +756,7 @@ class _SidebarItem extends StatelessWidget {
     this.dotColor,
     this.trailingActions,
     this.onSecondaryTap,
+    this.isDropHovered = false,
   });
 
   final String label;
@@ -724,6 +768,7 @@ class _SidebarItem extends StatelessWidget {
   final Color? dotColor;
   final List<Widget>? trailingActions;
   final VoidCallback? onSecondaryTap;
+  final bool isDropHovered;
 
   @override
   Widget build(BuildContext context) {
@@ -733,10 +778,12 @@ class _SidebarItem extends StatelessWidget {
       onTap: onClick,
       onSecondaryTap: onSecondaryTap,
       builder: (context, hovered) {
-        final bg = active
-            ? p.accent.withOpacity(0.12)
-            : (hovered ? p.hover : Colors.transparent);
-        final fg = active ? p.accent : p.text;
+        final bg = isDropHovered
+            ? p.accent.withOpacity(0.24)
+            : (active
+                ? p.accent.withOpacity(0.12)
+                : (hovered ? p.hover : Colors.transparent));
+        final fg = (active || isDropHovered) ? p.accent : p.text;
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
@@ -744,6 +791,9 @@ class _SidebarItem extends StatelessWidget {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(6),
+            border: isDropHovered
+                ? Border.all(color: p.accent, width: 1.5)
+                : null,
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,

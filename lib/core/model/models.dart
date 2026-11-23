@@ -450,6 +450,7 @@ class AppSettings {
   final int gitRefreshIntervalSeconds;
   final bool autoDetectProjects;
   final bool showToolsRail;
+  final bool openAtLogin;
   final List<PinnedApp> pinnedApps;
 
   const AppSettings({
@@ -460,6 +461,7 @@ class AppSettings {
     this.gitRefreshIntervalSeconds = 30,
     this.autoDetectProjects = true,
     this.showToolsRail = true,
+    this.openAtLogin = false,
     this.pinnedApps = const [],
   });
 
@@ -471,6 +473,7 @@ class AppSettings {
     int? gitRefreshIntervalSeconds,
     bool? autoDetectProjects,
     bool? showToolsRail,
+    bool? openAtLogin,
     List<PinnedApp>? pinnedApps,
   }) =>
       AppSettings(
@@ -482,6 +485,7 @@ class AppSettings {
             gitRefreshIntervalSeconds ?? this.gitRefreshIntervalSeconds,
         autoDetectProjects: autoDetectProjects ?? this.autoDetectProjects,
         showToolsRail: showToolsRail ?? this.showToolsRail,
+        openAtLogin: openAtLogin ?? this.openAtLogin,
         pinnedApps: pinnedApps ?? this.pinnedApps,
       );
 
@@ -493,6 +497,7 @@ class AppSettings {
         'gitRefreshIntervalSeconds': gitRefreshIntervalSeconds,
         'autoDetectProjects': autoDetectProjects,
         'showToolsRail': showToolsRail,
+        'openAtLogin': openAtLogin,
         'pinnedApps': pinnedApps.map((a) => a.toJson()).toList(),
       };
 
@@ -510,6 +515,7 @@ class AppSettings {
           (m['gitRefreshIntervalSeconds'] as num?)?.toInt() ?? 30,
       autoDetectProjects: m['autoDetectProjects'] as bool? ?? true,
       showToolsRail: m['showToolsRail'] as bool? ?? true,
+      openAtLogin: m['openAtLogin'] as bool? ?? false,
       pinnedApps: (m['pinnedApps'] as List?)
               ?.map(PinnedApp.fromJson)
               .whereType<PinnedApp>()

@@ -105,16 +105,18 @@ class Btn extends StatelessWidget {
 class IconBtn extends StatelessWidget {
   const IconBtn({
     super.key,
-    required this.icon,
+    this.icon,
+    this.child,
     this.onClick,
     this.tooltip,
     this.size = 28.0,
     this.iconSize = 15.0,
     this.color,
     this.active = false,
-  });
+  }) : assert(icon != null || child != null, 'Either icon or child must be provided');
 
-  final IconData icon;
+  final IconData? icon;
+  final Widget? child;
   final VoidCallback? onClick;
   final String? tooltip;
   final double size;
@@ -146,9 +148,10 @@ class IconBtn extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
           ),
           child: Center(
-            child: icon == AppIcons.github
-                ? GitHubIcon(size: iconSize, color: c)
-                : Icon(icon, size: iconSize, color: c),
+            child: child ??
+                (icon == AppIcons.github
+                    ? GitHubIcon(size: iconSize, color: c)
+                    : Icon(icon, size: iconSize, color: c)),
           ),
         );
       },

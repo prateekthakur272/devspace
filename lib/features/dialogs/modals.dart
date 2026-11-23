@@ -738,6 +738,55 @@ class _SettingsDialogState extends State<_SettingsDialog> {
             ),
           ),
         ],
+        const SizedBox(height: 12),
+
+        // Open at Login Switch Tile
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: p.field,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: p.border, width: 1),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: p.accent.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Icon(Icons.login_rounded, size: 16, color: p.accent),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const T('Open at Login', size: 12.5, weight: FontWeight.w600),
+                    const SizedBox(height: 2),
+                    T(
+                      'Automatically launch DevSpace when you start or log in to your computer.',
+                      size: 11,
+                      color: p.muted,
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: settings.openAtLogin,
+                activeColor: p.accent,
+                onChanged: (val) {
+                  _updateSettings((s) => s.copyWith(openAtLogin: val));
+                  widget.state.setOpenAtLogin(val);
+                },
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 14),
 
         // App Info & Version Banner

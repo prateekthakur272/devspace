@@ -316,7 +316,7 @@ class _EmptyCatalogState extends StatelessWidget {
               T('No projects in ${ws.name}', size: 15, weight: FontWeight.w600),
               const SizedBox(height: 6),
               T(
-                'Add a new project directly to this group or move existing repositories using the card context menu',
+                'Drag and drop a project folder here, add manually, or move existing repositories using the card context menu',
                 size: 12.5,
                 color: p.muted,
                 align: TextAlign.center,
@@ -400,7 +400,7 @@ class _EmptyCatalogState extends StatelessWidget {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 380),
               child: T(
-                'Add a Git repository or local workspace folder to begin organizing, monitoring, and launching your projects.',
+                'Drag and drop a project folder here, or browse a local directory to begin organizing, monitoring, and launching your projects.',
                 size: 12.5,
                 color: p.muted,
                 align: TextAlign.center,

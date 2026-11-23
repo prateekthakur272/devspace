@@ -247,24 +247,27 @@ class ProjectCard extends StatelessWidget {
                                     if (pNotes.isEmpty) return const SizedBox.shrink();
                                     return Padding(
                                       padding: const EdgeInsets.only(left: 6),
-                                      child: ClickableNoRipple(
-                                        onClick: () => state.updateUiState(
-                                          (s) => s.copyWith(activeTab: 'notes'),
-                                        ),
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                                          decoration: BoxDecoration(
-                                            color: p.field,
-                                            borderRadius: BorderRadius.circular(3),
-                                            border: Border.all(color: p.border, width: 1),
+                                      child: Tooltip(
+                                        message: '${pNotes.length} ${pNotes.length == 1 ? "note" : "notes"} · View in Notes',
+                                        child: ClickableNoRipple(
+                                          onClick: () => state.updateUiState(
+                                            (s) => s.copyWith(activeTab: 'notes'),
                                           ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(AppIcons.note, size: 9.5, color: p.muted),
-                                              const SizedBox(width: 3),
-                                              T('${pNotes.length}', size: 9, weight: FontWeight.w700, color: p.muted),
-                                            ],
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                            decoration: BoxDecoration(
+                                              color: p.field,
+                                              borderRadius: BorderRadius.circular(3),
+                                              border: Border.all(color: p.border, width: 1),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(AppIcons.note, size: 9.5, color: p.muted),
+                                                const SizedBox(width: 3),
+                                                T('${pNotes.length}', size: 9, weight: FontWeight.w700, color: p.muted),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -349,51 +352,17 @@ class ProjectCard extends StatelessWidget {
                               const SizedBox(width: 4),
                               IconBtn(
                                 icon: AppIcons.note,
-                                tooltip: 'Add note for this project',
+                                tooltip: 'Add Note',
                                 size: 28,
                                 iconSize: 15,
                                 onClick: () => state.openNewNoteInPane(initialProjectId: project.id),
                               ),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: HoverBuilder(
-                                  cursor: SystemMouseCursors.click,
-                                  onTap: () => state.launchProject(project),
-                                  builder: (context, editorHovered) {
-                                    return Tooltip(
-                                      message: 'Default editor: ${project.defaultEditor.label}\nDouble-click card to open',
-                                      child: Container(
-                                        height: 28,
-                                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                                        decoration: BoxDecoration(
-                                          color: editorHovered ? p.hover : p.field,
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(
-                                            color: editorHovered ? p.accent.withOpacity(0.5) : p.border,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            IdeIcon(editor: project.defaultEditor, size: 16),
-                                            const SizedBox(width: 6),
-                                            Flexible(
-                                              child: T(
-                                                project.defaultEditor.label,
-                                                size: 11.5,
-                                                weight: FontWeight.w500,
-                                                color: editorHovered ? p.text : p.muted,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
+                              const SizedBox(width: 4),
+                              IconBtn(
+                                tooltip: 'Open in ${project.defaultEditor.label}',
+                                size: 28,
+                                onClick: () => state.launchProject(project),
+                                child: IdeIcon(editor: project.defaultEditor, size: 16),
                               ),
                             ],
                           ),
@@ -460,7 +429,7 @@ class ProjectCard extends StatelessWidget {
             buffer.write(' (${gitStatus.lastCommitAuthor})');
           }
         }
-        buffer.write('\nClick for full Git health & details');
+        buffer.write('\nClick to open Git Radar');
 
         return Tooltip(
           message: buffer.toString(),
