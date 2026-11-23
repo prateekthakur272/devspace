@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:devspace/app/app_state.dart';
 import 'package:devspace/core/git/git_service.dart';
 import 'package:devspace/core/model/models.dart';
+import 'package:devspace/core/storage/storage.dart';
 import 'package:devspace/features/dialogs/modals.dart';
 import 'package:devspace/theme/theme.dart';
 
@@ -11,6 +13,7 @@ void main() {
 
   setUp(() {
     GitService.disableExecutionForTesting = true;
+    AppStore.setFlag('onboarding_completed', true);
   });
 
   tearDown(() {
@@ -91,5 +94,51 @@ void main() {
 
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('Modal does not get overwritten by onboarding on fresh installation', (tester) async {
+    final tempDir = Directory.systemTemp.createTempSync('fresh_install_modal_test_');
+    addTearDown(() {
+      AppStore.homeOverride = null;
+      try {
+        tempDir.deleteSync(recursive: true);
+      } catch (_) {}
+    });
+    AppStore.homeOverride = tempDir.path;
+    expect(AppStore.needsOnboarding, isTrue);
+
+    final state = AppState();
+    addTearDown(state.dispose);
+    final testProject = Project(
+      id: 'p1',
+      name: 'Test Project',
+      path: '/dev/test',
+      techStack: TechStack.flutter,
+      createdAt: DateTime.now(),
+    );
+    state.modal = ModalConfirmDelete(project: testProject);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PalScope(
+            pal: DarkPal,
+            child: ListenableBuilder(
+              listenable: state,
+              builder: (ctx, _) => Stack(
+                children: [
+                  const SizedBox.expand(),
+                  buildActiveModal(ctx, state),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Remove Project?'), findsOneWidget);
+    expect(find.text('Workspace Catalog & Groups'), findsNothing);
   });
 }

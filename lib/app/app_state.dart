@@ -147,7 +147,9 @@ class AppState with ChangeNotifier {
     // Launch initial onboarding tour on first run
     if (AppStore.needsOnboarding) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        modal = const ModalOnboarding();
+        if (_modal == null) {
+          modal = const ModalOnboarding();
+        }
       });
     }
   }
